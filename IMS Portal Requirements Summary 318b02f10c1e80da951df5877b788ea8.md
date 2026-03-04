@@ -464,7 +464,9 @@ Left panel: question list with marks entry per question.
   - Descriptive questions: editable marks input field (e.g. __ / 10) + optional comment field. The comment field is hidden by default and expands on click to keep the interface clean.
   - MCQ questions (typed): auto-filled, read-only, shows correct/incorrect result.
   - MCQ questions (uploaded): ✓ / ✗ toggle — admin clicks after reading the uploaded sheet.
-  - Running total updates live at the bottom as marks are entered.
+  - Running total updates live at the bottom as marks are entered — admin always sees the current total without needing to do anything.
+  - When admin clicks Finalise Evaluation, the system automatically calculates and stores the final total_marks_awarded for that student (sum of all question marks including MCQ auto-marks and toggled marks).
+  - If admin edits any marks after finalising, total_marks_awarded is automatically recalculated immediately — no need to click Finalise again.
   - Finalise button at the bottom of the left panel.
 Right panel: student submission viewer.
   - Typed answers: shows typed text or MCQ selection directly.
