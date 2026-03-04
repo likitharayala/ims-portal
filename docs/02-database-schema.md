@@ -194,7 +194,8 @@ CREATE INDEX idx_students_class      ON students(institute_id, class)    WHERE i
 CREATE INDEX idx_students_school     ON students(institute_id, school)   WHERE is_deleted = false;
 CREATE INDEX idx_students_created_at ON students(institute_id, created_at DESC);
 
--- Full-text search index for the student search bar (name + email + phone + class + school)
+-- Full-text search for the student search bar
+-- Covers name + email + phone (on users table)
 CREATE INDEX idx_students_search ON users
   USING GIN (
     to_tsvector('english',
@@ -204,6 +205,9 @@ CREATE INDEX idx_students_search ON users
     )
   )
   WHERE is_deleted = false;
+
+-- Class and school are filtered via B-tree indexes (idx_students_class, idx_students_school)
+-- The student search query JOINs users + students and applies GIN for text + B-tree for class/school
 ```
 
 ---
@@ -270,8 +274,8 @@ Each row is one assessment card. Supports MCQ, Descriptive, or Mixed types.
 | subjects | TEXT[] | NOT NULL | Array of subjects e.g. ['Maths', 'Physics'] |
 | type | VARCHAR(20) | NOT NULL | mcq / descriptive / mixed |
 | total_marks | INTEGER | NOT NULL | Sum of all question marks (validated on create) |
-| start_at | TIMESTAMPTZ | NOT NULL | Students can begin from this time |
-| end_at | TIMESTAMPTZ | NOT NULL | Deadline |
+| start_at | TIMESTAMPTZ | | Students can begin from this time — nullable, set before publishing |
+| end_at | TIMESTAMPTZ | | Deadline — nullable, set before publishing |
 | status | VARCHAR(20) | NOT NULL, DEFAULT 'draft' | draft → published → active → closed → evaluated |
 | ai_generated | BOOLEAN | NOT NULL, DEFAULT false | Questions were AI-generated |
 | instructions | TEXT | | Instructions shown to student before starting |
@@ -285,11 +289,15 @@ Each row is one assessment card. Supports MCQ, Descriptive, or Mixed types.
 | created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
 | updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
 
+**Constraints (application-level, not DB-level):**
+- Publishing is blocked unless: `start_at IS NOT NULL AND end_at IS NOT NULL AND question_count >= 1`
+- `start_at` and `end_at` are nullable at DB level — validation happens in the service layer at publish time
+
 **Indexes:**
 ```sql
 CREATE INDEX idx_assessments_institute ON assessments(institute_id, is_deleted);
 CREATE INDEX idx_assessments_status    ON assessments(institute_id, status)           WHERE is_deleted = false;
-CREATE INDEX idx_assessments_timing    ON assessments(institute_id, start_at, end_at) WHERE is_deleted = false;
+CREATE INDEX idx_assessments_timing    ON assessments(institute_id, start_at, end_at) WHERE is_deleted = false AND start_at IS NOT NULL;
 CREATE INDEX idx_assessments_created   ON assessments(institute_id, created_at DESC);
 ```
 
