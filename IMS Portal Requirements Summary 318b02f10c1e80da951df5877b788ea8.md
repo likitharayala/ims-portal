@@ -398,16 +398,41 @@ Admin can mix AI-generated and manually-written questions in the same assessment
 Workflow:
 Generate → Review → Upload → Set timeline → Publish
 
+Student Submission Modes:
+
+Every assessment supports both modes simultaneously. Students can use one or both.
+
+Mode 1 — Online (typing):
+Student sees all questions during the exam.
+For MCQ questions: selectable options are displayed.
+For Descriptive questions: text input fields are provided for typing answers.
+Answers auto-save every 60 seconds.
+Student submits manually or system auto-submits at end_at.
+
+Mode 2 — Written exam upload:
+Student sees all questions during the exam (questions always visible regardless of mode).
+Student writes answers on paper and uploads images or a PDF of the answer sheet.
+Upload must be completed before end_at.
+Allowed file types: JPG, PNG, PDF.
+Maximum total upload size: 20MB.
+Student can upload multiple files (images + PDF combined, total ≤ 20MB).
+
+Both modes at once:
+Student can type answers for some questions AND upload a file for the full answer sheet.
+Admin sees both typed answers and uploaded files in the evaluation view.
+
 Evaluation:
-Admin can:
-Mark descriptive answers (assign marks per answer)
-Select correct/incorrect for MCQ (auto-calculate marks)
-Auto-calculate total marks after evaluation
-Upload camera images of written answers
+Admin opens the evaluation interface per student.
+Admin sees typed answers (MCQ selections + descriptive text) and uploaded files side by side.
+Uploaded images and PDFs are displayed inline in the evaluation interface — no download needed.
+Admin assigns marks per descriptive answer.
+Admin can add feedback/comments per answer (optional).
+MCQ answers are auto-evaluated against correct_option.
+Admin triggers final evaluation to calculate total_marks_awarded per student.
 
 MCQ auto-evaluation:
 When assessment is closed, MCQ answers are auto-evaluated against correct_option.
-Descriptive answers require manual marks from admin.
+Descriptive answers and uploaded answer sheets require manual marks from admin.
 Admin triggers final evaluation to calculate total_marks_awarded per student.
 
 Marks editing after evaluation:
@@ -418,15 +443,10 @@ Add a results_released boolean field to assessments.
 Student during assessment:
 Locked until start time (status: published — student sees card but cannot open)
 Auto unlock at start_at
-Can save answers (auto-save every 60 seconds)
+Answers auto-save every 60 seconds
 Auto-submit at end_at if student has not submitted manually
 Student cannot re-open or edit after submission
 View results only after admin releases results (results_released = true)
-
-Answer image upload:
-Allowed formats: JPG, PNG only
-Maximum size: 10MB per image
-Maximum images per question: 3
 
 Payments:
 

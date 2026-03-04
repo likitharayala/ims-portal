@@ -63,10 +63,12 @@ All timestamps stored UTC. All UI displays in **IST (UTC+5:30)**. Assessment tim
 | Payments — is there a gateway? | No. Manual tracking only. Status: pending / paid / overdue |
 | Fee amount | Set per student at creation. Same every month until admin changes it. Change applies from next month — past months unaffected |
 | Overdue status | Auto-set by daily `@Cron` job — pending payments become overdue 5 days after the month ends (e.g. Jan → overdue Feb 6). Admin can manually override in either direction. Cron ONLY touches `pending` records — never `paid` or `overdue`. Overdue is sticky: stays overdue until admin explicitly marks it paid. System never auto-marks anything as paid |
+| Assessment submission modes | Both modes always available on every assessment: (1) Online — type MCQ selections + descriptive text; (2) Upload — upload handwritten answer sheet (JPG/PNG/PDF, 20MB total). Student can use both simultaneously |
 | Assessment auto-submit | Yes — auto-submits at `end_at` if student hasn't submitted |
 | Assessment auto-save | Yes — every 60 seconds during active exam |
 | MCQ auto-evaluation | Auto-evaluated when assessment closes. Admin triggers final total calculation |
 | Results visibility | Students see marks only after admin sets `results_released = true` |
+| Admin evaluation UI | Student's typed answers + uploaded files shown inline side by side. No download needed. Admin assigns marks per answer |
 | Can admin mix AI + manual questions? | Yes |
 | AI generation failure fallback | Show error, allow manual entry |
 | Feature disable behaviour | Data hidden, not deleted. Re-enable restores everything |
@@ -95,7 +97,7 @@ All timestamps stored UTC. All UI displays in **IST (UTC+5:30)**. Assessment tim
 | Upload type | Allowed formats | Max size | Validation |
 |---|---|---|---|
 | Study materials | PDF only | 50MB | MIME type + extension both checked |
-| Answer images | JPG, PNG | 10MB each, max 3/question | MIME type + extension |
+| Answer sheet upload | JPG, PNG, PDF | 20MB total per submission | MIME type + extension |
 | Profile photo | JPG, PNG | 5MB | MIME type + extension |
 | Bulk student upload | .xlsx only | — | Column names + MIME type |
 
