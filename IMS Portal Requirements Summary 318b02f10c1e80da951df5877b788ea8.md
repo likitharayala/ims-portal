@@ -461,7 +461,7 @@ Admin never manually types marks for MCQ questions — only toggles correct/inco
 
 Evaluation interface layout:
 Left panel: question list with marks entry per question.
-  - Descriptive questions: editable marks input field (e.g. __ / 10) + optional comment field.
+  - Descriptive questions: editable marks input field (e.g. __ / 10) + optional comment field. The comment field is hidden by default and expands on click to keep the interface clean.
   - MCQ questions (typed): auto-filled, read-only, shows correct/incorrect result.
   - MCQ questions (uploaded): ✓ / ✗ toggle — admin clicks after reading the uploaded sheet.
   - Running total updates live at the bottom as marks are entered.
