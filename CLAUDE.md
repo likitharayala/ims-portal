@@ -68,7 +68,7 @@ All timestamps stored UTC. All UI displays in **IST (UTC+5:30)**. Assessment tim
 | Assessment auto-save | Yes — every 60 seconds during active exam |
 | MCQ auto-evaluation | Auto-evaluated when assessment closes. Admin triggers final total calculation |
 | Results visibility | Students see marks only after admin sets `results_released = true` |
-| Admin evaluation UI | Student's typed answers + uploaded files shown inline side by side. No download needed. Admin assigns marks per answer |
+| Admin evaluation UI | Student-by-student navigation. Typed answers + uploaded files inline side by side. Mixed submissions: both visible, admin enters one set of marks. Upload-only: admin chooses per-question marks or single total. Progress bar + per-student badge. Marks auto-save as typed + Finalise button at end |
 | Can admin mix AI + manual questions? | Yes |
 | AI generation failure fallback | Show error, allow manual entry |
 | Feature disable behaviour | Data hidden, not deleted. Re-enable restores everything |
