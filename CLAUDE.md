@@ -61,8 +61,8 @@ All timestamps stored UTC. All UI displays in **IST (UTC+5:30)**. Assessment tim
 | Email verification | Required on admin signup before dashboard access |
 | Can students send notifications? | No — students receive only. No student-to-admin messaging in V1 |
 | Payments — is there a gateway? | No. Manual tracking only. Status: pending / paid / overdue |
-| Fee amount | Set per student per month by admin |
-| Overdue status | Admin manually marks — no automatic calculation |
+| Fee amount | Set per student at creation. Same every month until admin changes it. Change applies from next month — past months unaffected |
+| Overdue status | Auto-set by daily `@Cron` job — pending payments become overdue 5 days after the month ends (e.g. Jan → overdue Feb 6). Admin can manually override in either direction |
 | Assessment auto-submit | Yes — auto-submits at `end_at` if student hasn't submitted |
 | Assessment auto-save | Yes — every 60 seconds during active exam |
 | MCQ auto-evaluation | Auto-evaluated when assessment closes. Admin triggers final total calculation |
