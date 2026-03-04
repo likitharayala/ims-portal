@@ -463,11 +463,25 @@ Admin decides per assessment whether negative marking applies.
 When creating an assessment, admin can enable negative marking and set the deduction value per wrong MCQ answer.
 If negative marking is disabled: wrong MCQ answer = 0 marks.
 Unattempted MCQ questions always = 0 marks regardless of negative marking setting.
+Total marks awarded are capped at 0 — they can never go negative even if deductions exceed correct marks.
 
 Unattempted questions:
 If a student skips a question, admin sees a "Not attempted" label in the evaluation view.
 The marks field for that question starts empty — admin must manually enter 0 if desired.
 System does not auto-assign 0 for skipped questions.
+
+Absent students (never submitted):
+If a student never opened or submitted the assessment, they appear in the evaluation list with an "Absent" badge.
+Their marks are automatically set to 0. No evaluation action required from admin.
+Absent students are included when results are released — they see their score as 0.
+
+Results release:
+Admin can release results for individual students or release all at once.
+Individual release: admin selects a student and clicks "Release Results" for that student only.
+Bulk release: admin clicks "Release All" to release results for every student at once.
+Once released, marks remain editable. Admin can update marks at any time even after release.
+When admin updates marks after release, students see the updated marks immediately.
+There is no lock after release — admin always retains full control over marks.
 
 Marks editing after evaluation:
 Admin can re-evaluate and update marks before results are released to students.
