@@ -4,6 +4,8 @@
 
 The IMS Portal authentication system handles two user types (Admin and Student) with different registration flows, shared JWT-based session management, and strict single active session enforcement.
 
+**Email service:** All auth emails (verification, password reset) are sent via **Nodemailer + Gmail SMTP**. Configure via `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` environment variables.
+
 ---
 
 ## User Types & Registration
@@ -15,7 +17,7 @@ Admin creates their own account via the public Sign Up page.
 **Required fields:**
 - Name
 - Phone number (valid format)
-- Email (globally unique across all institutes)
+- Email (globally unique across all institutes and all users — enforced by `UNIQUE (email)` on `users` table)
 - Institute name (globally unique)
 - Password (minimum 8 characters)
 - Feature selection checkboxes (at least one):
@@ -38,6 +40,7 @@ Admin creates their own account via the public Sign Up page.
 - Clicking the link in the email calls `GET /auth/verify-email?token=<token>`
 - On success: `is_email_verified = true`, token fields cleared
 - On expiry: admin can request a new verification email from the login page
+- Admin **cannot change their email address** after signup in V1
 
 ---
 
@@ -264,25 +267,28 @@ After logout, any existing tokens are rejected by session validation.
 
 ```sql
 users (
-  id                           UUID PRIMARY KEY,
-  institute_id                 UUID NOT NULL REFERENCES institutes(id),
-  role                         VARCHAR(20) NOT NULL,         -- 'admin' | 'student'
-  email                        VARCHAR(255) UNIQUE NOT NULL,
-  phone                        VARCHAR(20),
-  password_hash                VARCHAR(255) NOT NULL,
-  session_id                   UUID,                         -- current active session
-  refresh_token_hash           VARCHAR(255),
-  is_email_verified            BOOLEAN DEFAULT false,
-  email_verification_token     VARCHAR(255),
-  email_verification_expires_at TIMESTAMPTZ,
-  password_reset_token         VARCHAR(255),
-  password_reset_expires_at    TIMESTAMPTZ,
-  must_change_password         BOOLEAN DEFAULT false,        -- true for new students
-  is_deleted                   BOOLEAN DEFAULT false,
-  deleted_at                   TIMESTAMPTZ,
-  deleted_by                   UUID,
-  created_at                   TIMESTAMPTZ DEFAULT now(),
-  updated_at                   TIMESTAMPTZ DEFAULT now()
+  id                            UUID PRIMARY KEY,
+  institute_id                  UUID NOT NULL REFERENCES institutes(id),
+  role_id                       SMALLINT NOT NULL,            -- 1=admin, 2=student
+  name                          VARCHAR(255) NOT NULL,
+  email                         VARCHAR(255) NOT NULL UNIQUE, -- globally unique
+  phone                         VARCHAR(20),
+  password_hash                 VARCHAR(255) NOT NULL,
+  session_id                    UUID,                         -- current active session
+  refresh_token_hash            VARCHAR(255),
+  is_email_verified             BOOLEAN NOT NULL DEFAULT false,
+  email_verification_token      VARCHAR(255),                 -- stored hashed
+  email_verification_expires_at TIMESTAMPTZ,                  -- 24h from issue
+  password_reset_token          VARCHAR(255),                 -- stored hashed
+  password_reset_expires_at     TIMESTAMPTZ,                  -- 30min from issue
+  must_change_password          BOOLEAN NOT NULL DEFAULT false, -- true for new students
+  is_active                     BOOLEAN NOT NULL DEFAULT true,
+  last_login_at                 TIMESTAMPTZ,
+  is_deleted                    BOOLEAN NOT NULL DEFAULT false,
+  deleted_at                    TIMESTAMPTZ,
+  deleted_by                    UUID,
+  created_at                    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at                    TIMESTAMPTZ NOT NULL DEFAULT now()
 )
 ```
 
