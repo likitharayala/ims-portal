@@ -458,10 +458,26 @@ When assessment is closed, MCQ answers are auto-evaluated against correct_option
 Descriptive answers and uploaded answer sheets require manual marks from admin.
 Admin triggers final evaluation to calculate total_marks_awarded per student.
 
+Negative marking:
+Admin decides per assessment whether negative marking applies.
+When creating an assessment, admin can enable negative marking and set the deduction value per wrong MCQ answer.
+If negative marking is disabled: wrong MCQ answer = 0 marks.
+Unattempted MCQ questions always = 0 marks regardless of negative marking setting.
+
+Unattempted questions:
+If a student skips a question, admin sees a "Not attempted" label in the evaluation view.
+The marks field for that question starts empty — admin must manually enter 0 if desired.
+System does not auto-assign 0 for skipped questions.
+
 Marks editing after evaluation:
 Admin can re-evaluate and update marks before results are released to students.
 Once admin marks results as "released", students can view their marks.
 Add a results_released boolean field to assessments.
+
+Student result view (after results released):
+Student sees a per-question marks breakdown (e.g. Q1: 8/10, Q2: 5/10).
+Student also sees any feedback/comments admin added per answer during evaluation.
+Student sees their total marks and the assessment total marks.
 
 Student during assessment:
 Locked until start time (status: published — student sees card but cannot open)
