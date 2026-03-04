@@ -66,7 +66,8 @@ All timestamps stored UTC. All UI displays in **IST (UTC+5:30)**. Assessment tim
 | Assessment submission modes | Both modes always available on every assessment: (1) Online — type MCQ selections + descriptive text; (2) Upload — upload handwritten answer sheet (JPG/PNG/PDF, 20MB total). Student can use both simultaneously |
 | Assessment auto-submit | Yes — auto-submits at `end_at` if student hasn't submitted |
 | Assessment auto-save | Yes — every 60 seconds during active exam |
-| MCQ auto-evaluation | Auto-evaluated when assessment closes. Admin triggers final total calculation |
+| MCQ evaluation | Typed MCQ → auto-evaluated, read-only in evaluation UI. Uploaded MCQ → admin clicks ✓/✗ toggle per question, system calculates marks. Admin never types MCQ marks manually |
+| Evaluation layout | Left panel: question list with marks input / ✓✗ toggle / comment per question + live running total + Finalise button. Right panel: submission viewer (typed text or image/PDF inline). Same layout for all submission types |
 | Negative marking | Admin decides per assessment. If enabled, admin sets deduction value per wrong MCQ. Unattempted always = 0. Total capped at 0 — never goes negative |
 | Unattempted questions | Shows "Not attempted" in evaluation view. Marks field empty — admin enters 0 manually if needed |
 | Absent students | Never submitted = Absent badge in evaluation list. Marks auto-set to 0. No evaluation action needed |

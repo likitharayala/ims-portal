@@ -453,10 +453,24 @@ Marks auto-save as admin enters them. Admin can close and resume at any time wit
 Admin clicks "Finalise Evaluation" at the end to confirm all marks are complete and trigger total_marks_awarded calculation.
 After finalising, admin can still re-evaluate and update marks before releasing results.
 
-MCQ auto-evaluation:
-When assessment is closed, MCQ answers are auto-evaluated against correct_option.
-Descriptive answers and uploaded answer sheets require manual marks from admin.
-Admin triggers final evaluation to calculate total_marks_awarded per student.
+MCQ evaluation:
+Typed MCQ answers (student clicked an option in the portal) are auto-evaluated against correct_option when the assessment closes. Admin sees the result as read-only — no action needed.
+Uploaded MCQ answers (student circled an answer on paper) cannot be auto-evaluated. Admin manually marks each MCQ using a correct (✓) / incorrect (✗) toggle in the evaluation interface. System calculates marks automatically from the toggle.
+If negative marking is enabled, toggling ✗ automatically applies the configured deduction.
+Admin never manually types marks for MCQ questions — only toggles correct/incorrect for uploaded submissions.
+
+Evaluation interface layout:
+Left panel: question list with marks entry per question.
+  - Descriptive questions: editable marks input field (e.g. __ / 10) + optional comment field.
+  - MCQ questions (typed): auto-filled, read-only, shows correct/incorrect result.
+  - MCQ questions (uploaded): ✓ / ✗ toggle — admin clicks after reading the uploaded sheet.
+  - Running total updates live at the bottom as marks are entered.
+  - Finalise button at the bottom of the left panel.
+Right panel: student submission viewer.
+  - Typed answers: shows typed text or MCQ selection directly.
+  - Uploaded files: shows images and PDF inline (scrollable viewer).
+  - Mixed: shows typed answers first, uploaded files below.
+Admin reads the right panel and assigns marks on the left panel. Same layout for all submission types.
 
 Negative marking:
 Admin decides per assessment whether negative marking applies.
