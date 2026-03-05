@@ -40,6 +40,12 @@ CREATE UNIQUE INDEX idx_institutes_slug  ON institutes(slug);
 
 **Notes:** No soft delete on institutes — deactivated via `is_active = false`. Supabase auto-manages `created_at` via Row Level Security if needed.
 
+**`is_active` behaviour in the guard pipeline:**
+Setting `is_active = false` on the `institutes` row does **not** automatically block logins — the `JwtAuthGuard` queries `users`, not `institutes`. To block all users of a deactivated institute, set `users.is_active = false` for every associated user row. `institutes.is_active` is a platform-level marker used by the super-admin (Phase 5) and for billing logic; it is not checked in the auth guard chain in V1.
+
+**`slug` field:**
+Reserved for future subdomain routing (`sunrise-academy.imsportal.com`). Not used in any route or guard in V1. Stored now to reserve the unique identifier early and prevent name-squatting as institutes onboard.
+
 ---
 
 ### Table: `roles`
@@ -168,7 +174,7 @@ Extended profile for student users. One-to-one with `users` where `role_id = 2`.
 | roll_number | VARCHAR(50) | | Institute-assigned roll number |
 | class | VARCHAR(100) | NOT NULL | Class or grade e.g. "Grade 10", "Class 12A" |
 | school | VARCHAR(255) | NOT NULL | School or institution the student attends |
-| fee_amount | NUMERIC(10,2) | NOT NULL | Monthly fee in ₹ — set at creation, stays until admin changes |
+| fee_amount | NUMERIC(10,2) | NOT NULL, CHECK (fee_amount >= 0) | Monthly fee in ₹ — set at creation, stays until admin changes. 0 is valid for scholarship/free students. |
 | date_of_birth | DATE | | |
 | address | TEXT | | |
 | parent_name | VARCHAR(255) | | |
@@ -226,7 +232,7 @@ Each row is one material card. Supports the secure document viewer with in-docum
 | description | TEXT | | Optional short description |
 | file_url | TEXT | NOT NULL | MinIO path: /{institute_id}/materials/{uuid}.pdf |
 | file_name | VARCHAR(255) | NOT NULL | Original filename |
-| file_type | VARCHAR(20) | NOT NULL | Always 'pdf' — only PDF uploads allowed |
+| file_type | VARCHAR(20) | NOT NULL, CHECK (file_type = 'pdf') | Always 'pdf' — only PDF uploads allowed |
 | file_size_bytes | BIGINT | | File size for display |
 | is_hidden | BOOLEAN | NOT NULL, DEFAULT false | Admin hid from students (not deleted) |
 | uploaded_by | UUID | NOT NULL, FK → users.id | Admin who uploaded |
@@ -272,15 +278,15 @@ Each row is one assessment card. Supports MCQ, Descriptive, or Mixed types.
 | institute_id | UUID | NOT NULL, FK → institutes.id | Tenant reference |
 | title | VARCHAR(255) | NOT NULL | Assessment title (shown on card) |
 | subjects | TEXT[] | NOT NULL | Array of subjects e.g. ['Maths', 'Physics'] |
-| type | VARCHAR(20) | NOT NULL | mcq / descriptive / mixed |
-| total_marks | INTEGER | NOT NULL | Sum of all question marks (validated on create) |
+| type | VARCHAR(20) | NOT NULL, CHECK (type IN ('mcq', 'descriptive', 'mixed')) | mcq / descriptive / mixed |
+| total_marks | INTEGER | NOT NULL | Sum of all question marks — kept live by service on every question add/update/delete |
 | start_at | TIMESTAMPTZ | | Students can begin from this time — nullable, set before publishing |
 | end_at | TIMESTAMPTZ | | Deadline — nullable, set before publishing |
-| status | VARCHAR(20) | NOT NULL, DEFAULT 'draft' | draft → published → active → closed → evaluated |
+| status | VARCHAR(20) | NOT NULL, DEFAULT 'draft', CHECK (status IN ('draft', 'published', 'active', 'closed', 'evaluated')) | draft → published → active → closed → evaluated |
 | ai_generated | BOOLEAN | NOT NULL, DEFAULT false | Questions were AI-generated |
 | instructions | TEXT | | Instructions shown to student before starting |
 | negative_marking_enabled | BOOLEAN | NOT NULL, DEFAULT false | Whether wrong MCQ answers deduct marks |
-| negative_marking_value | NUMERIC(5,2) | NOT NULL, DEFAULT 0 | Marks deducted per wrong MCQ answer |
+| negative_marking_value | NUMERIC(5,2) | NOT NULL, DEFAULT 0, CHECK (negative_marking_value >= 0) | Marks deducted per wrong MCQ answer — must be positive; sign is applied by service |
 | results_released | BOOLEAN | NOT NULL, DEFAULT false | When true, students can see their marks |
 | created_by | UUID | NOT NULL, FK → users.id | Admin who created |
 | is_deleted | BOOLEAN | NOT NULL, DEFAULT false | |
@@ -289,9 +295,23 @@ Each row is one assessment card. Supports MCQ, Descriptive, or Mixed types.
 | created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
 | updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
 
-**Constraints (application-level, not DB-level):**
+**Constraints:**
+```sql
+-- Prevent end_at being set before start_at at DB level
+ALTER TABLE assessments
+  ADD CONSTRAINT chk_assessments_timing
+    CHECK (end_at IS NULL OR start_at IS NULL OR end_at > start_at);
+```
+
+**Application-level constraints (enforced in service, not DB):**
 - Publishing is blocked unless: `start_at IS NOT NULL AND end_at IS NOT NULL AND question_count >= 1`
-- `start_at` and `end_at` are nullable at DB level — validation happens in the service layer at publish time
+- At publish time the service also validates: `SUM(marks) FROM assessment_questions = assessments.total_marks`
+
+**`total_marks` update strategy:**
+`total_marks` is kept live by the `AssessmentsService` on every question mutation — both operations (question change + `total_marks` update) run in the same DB transaction:
+- `addQuestion` → `total_marks += question.marks`
+- `updateQuestion` (marks changed) → `total_marks = total_marks - old_marks + new_marks`
+- `deleteQuestion` (draft only) → `total_marks -= question.marks`
 
 **Indexes:**
 ```sql
@@ -313,21 +333,31 @@ Individual questions belonging to an assessment.
 | institute_id | UUID | NOT NULL, FK → institutes.id | Tenant reference |
 | assessment_id | UUID | NOT NULL, FK → assessments.id ON DELETE CASCADE | Parent assessment |
 | question_text | TEXT | NOT NULL | The question body |
-| type | VARCHAR(20) | NOT NULL | mcq / descriptive |
+| type | VARCHAR(20) | NOT NULL, CHECK (type IN ('mcq', 'descriptive')) | mcq / descriptive |
 | marks | INTEGER | NOT NULL, CHECK (marks > 0) | Marks allocated |
-| difficulty | VARCHAR(10) | NOT NULL | easy / medium / hard |
-| options | JSONB | | MCQ only: exactly 4 options — [{label: "A", text: "...", is_correct: false}, {label: "B",...}, {label: "C",...}, {label: "D",...}] |
-| correct_option | VARCHAR(5) | | MCQ only: correct label e.g. "A". Always exactly one correct answer. |
+| difficulty | VARCHAR(10) | NOT NULL, CHECK (difficulty IN ('easy', 'medium', 'hard')) | easy / medium / hard |
+| options | JSONB | | MCQ only: exactly 4 options — `[{"label": "A", "text": "..."}, {"label": "B", ...}, {"label": "C", ...}, {"label": "D", ...}]`. No `is_correct` field — use `correct_option` column instead. |
+| correct_option | VARCHAR(5) | | MCQ only: correct label e.g. `"A"`. Single source of truth for the correct answer. `is_correct` is derived at query time: `option.label === correct_option`. |
 | order_index | SMALLINT | NOT NULL, DEFAULT 0 | Display order within assessment |
-| image_url | TEXT | | Optional question image in MinIO |
+| image_url | TEXT | | Optional question image — MinIO path: `/{institute_id}/questions/{question_id}.{ext}` |
 | created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
 
 **Indexes:**
 ```sql
-CREATE INDEX idx_questions_assessment  ON assessment_questions(assessment_id, order_index);
-CREATE INDEX idx_questions_institute   ON assessment_questions(institute_id);
-CREATE INDEX idx_questions_options_gin ON assessment_questions USING GIN (options);
+CREATE INDEX idx_questions_assessment ON assessment_questions(assessment_id, order_index);
+CREATE INDEX idx_questions_institute  ON assessment_questions(institute_id);
+-- Note: no GIN index on options JSONB — questions are always fetched by assessment_id,
+-- never searched inside the options field. GIN here would add write overhead for zero benefit.
 ```
+
+**No soft delete on `assessment_questions`:**
+Questions are hard-deleted. The service enforces: questions can only be deleted when the assessment is in `draft` status. Once published/active/closed/evaluated, question deletion is blocked to prevent dangling `question_id` references in existing `submissions.answers` JSONB. To restructure questions on a published assessment, the admin must duplicate the assessment.
+
+**Question image uploads:**
+- Storage path: `/{institute_id}/questions/{question_id}.{ext}`
+- Allowed formats: JPG, PNG — max 5MB
+- Served via pre-signed URL (same 15-min pattern as materials)
+- Not yet listed in Section 5 (File Storage) — add when implementing
 
 ---
 
@@ -347,9 +377,10 @@ One row per student per assessment. Tracks the full answer set and evaluation.
 | is_absent | BOOLEAN | NOT NULL, DEFAULT false | true if student never opened or submitted the assessment |
 | flag_for_review | BOOLEAN | NOT NULL, DEFAULT false | Admin-only flag for submissions needing re-check |
 | results_released_at | TIMESTAMPTZ | | When admin released results for this specific student |
-| evaluated_by | UUID | FK → users.id | Admin evaluator |
+| evaluation_type | VARCHAR(10) | CHECK (evaluation_type IN ('auto', 'manual')) | `auto` = MCQ system-evaluated on close; `manual` = admin-evaluated; NULL = not yet evaluated |
+| evaluated_by | UUID | FK → users.id | Admin evaluator — NULL for auto-evaluated submissions |
 | evaluated_at | TIMESTAMPTZ | | When evaluation was completed |
-| status | VARCHAR(20) | NOT NULL, DEFAULT 'pending' | pending / submitted / evaluated |
+| status | VARCHAR(20) | NOT NULL, DEFAULT 'pending', CHECK (status IN ('pending', 'submitted', 'evaluated')) | pending / submitted / evaluated |
 | submitted_at | TIMESTAMPTZ | | When student hit submit (or auto-submit at end_at) |
 | created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
 | updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
@@ -380,10 +411,11 @@ Monthly fee record per student. The modal shows last 10 months.
 | id | UUID | PK, DEFAULT gen_random_uuid() | |
 | institute_id | UUID | NOT NULL, FK → institutes.id | Tenant reference |
 | student_id | UUID | NOT NULL, FK → students.id | Student reference |
-| month | DATE | NOT NULL | First day of the month e.g. 2025-03-01 |
-| amount | NUMERIC(10,2) | NOT NULL | Fee amount at time of record creation (snapshot of student fee_amount) |
-| status | VARCHAR(20) | NOT NULL, DEFAULT 'pending' | pending / paid / overdue |
+| month | DATE | NOT NULL, CHECK (EXTRACT(day FROM month) = 1) | First day of the month e.g. 2025-03-01 — DB enforces day=1 |
+| amount | NUMERIC(10,2) | NOT NULL, CHECK (amount >= 0) | Fee amount at time of record creation (snapshot of student fee_amount) |
+| status | VARCHAR(20) | NOT NULL, DEFAULT 'pending', CHECK (status IN ('pending', 'paid', 'overdue')) | pending / paid / overdue |
 | paid_at | TIMESTAMPTZ | | When marked as paid |
+| reference | VARCHAR(100) | | Payment reference — UPI transaction ID, NEFT ref, cash receipt number. Optional, admin-entered. |
 | updated_by | UUID | FK → users.id | Admin who last edited status |
 | notes | TEXT | | Optional admin remarks |
 | is_deleted | BOOLEAN | NOT NULL, DEFAULT false | |
@@ -445,8 +477,8 @@ Notifications created by admin — broadcast or targeted.
 | institute_id | UUID | NOT NULL, FK → institutes.id | Tenant reference |
 | title | VARCHAR(100) | NOT NULL | Notification heading (max 100 characters) |
 | body | VARCHAR(500) | NOT NULL | Full notification content (max 500 characters) |
-| type | VARCHAR(30) | NOT NULL, DEFAULT 'general' | general / payment_reminder / assessment_reminder |
-| target | VARCHAR(20) | NOT NULL, DEFAULT 'all' | all / specific / pending_overdue (payment_reminder only) |
+| type | VARCHAR(30) | NOT NULL, DEFAULT 'general', CHECK (type IN ('general', 'payment_reminder', 'assessment_reminder')) | general / payment_reminder / assessment_reminder |
+| target | VARCHAR(20) | NOT NULL, DEFAULT 'all', CHECK (target IN ('all', 'specific', 'pending_overdue')) | all / specific / pending_overdue (payment_reminder only — requires payments feature enabled) |
 | sent_by | UUID | NOT NULL, FK → users.id | Admin sender |
 | is_deleted | BOOLEAN | NOT NULL, DEFAULT false | |
 | deleted_at | TIMESTAMPTZ | | |
@@ -495,7 +527,14 @@ CREATE INDEX idx_notif_unread ON notification_recipients(student_id, is_read)
 
 ### Table: `sessions`
 
-Refresh token store. Enables rotation and revocation without touching the users table.
+Audit/history log of all login sessions. Records device info and token lifecycle for security review.
+
+**Important — role clarification:**
+This table is **not** used in the auth guard pipeline for session enforcement. The single-session enforcement mechanism queries `users.session_id` directly (see Section 3). `sessions` is an audit trail only — it records every login event with IP and device info. If you're debugging "why was a user logged out", check this table.
+
+**What writes to it:** A new row is inserted on every login. `revoked_at` is set on logout or token-reuse attack detection.
+
+**Cleanup:** A weekly cron job deletes rows where `expires_at < now() - interval '30 days'` to prevent unbounded growth.
 
 | Column | Type | Constraints | Description |
 |---|---|---|---|
@@ -530,7 +569,7 @@ Append-only immutable record of every mutation. Never updated, never deleted.
 | institute_id | UUID | NOT NULL, FK → institutes.id | Tenant reference |
 | actor_id | UUID | NOT NULL, FK → users.id | Who performed the action |
 | actor_role | VARCHAR(20) | NOT NULL | Role at time of action |
-| action | VARCHAR(50) | NOT NULL | CREATE / UPDATE / DELETE / HIDE / EVALUATE / LOGIN / LOGOUT / BULK_UPLOAD |
+| action | VARCHAR(50) | NOT NULL, CHECK (action IN ('CREATE', 'UPDATE', 'DELETE', 'HIDE', 'UNHIDE', 'EVALUATE', 'LOGIN', 'LOGOUT', 'BULK_UPLOAD', 'EXPORT', 'PUBLISH', 'RELEASE_RESULTS', 'PASSWORD_CHANGED', 'PASSWORD_RESET')) | Enum of all valid audit actions |
 | resource_type | VARCHAR(50) | NOT NULL | users / students / materials / assessments / payments / notifications |
 | resource_id | UUID | | ID of the affected record |
 | old_values | JSONB | | State before mutation |
@@ -785,21 +824,38 @@ CREATE INDEX idx_assessments_active ON assessments(institute_id, start_at, end_a
 ### Pattern 5 — Full-text search (GIN indexes)
 ```sql
 -- Student search bar (searches name + email + phone)
+-- Uses 'simple' config — no stemming for proper nouns (Indian names).
+-- Phone numbers are not included in GIN — use trigram or LIKE for partial phone search.
 CREATE INDEX idx_students_search ON users
-  USING GIN (to_tsvector('english', name || ' ' || COALESCE(email,'') || ' ' || COALESCE(phone,'')))
+  USING GIN (to_tsvector('simple', name || ' ' || COALESCE(email,'')))
   WHERE is_deleted = false;
+
+-- Trigram index for partial phone number search (e.g. searching "9876" matches "9876543210")
+CREATE INDEX idx_users_phone_trgm ON users
+  USING GIN (phone gin_trgm_ops)
+  WHERE is_deleted = false AND phone IS NOT NULL;
 
 -- Study materials search bar (title + subject + author)
 CREATE INDEX idx_materials_search ON study_materials
-  USING GIN (to_tsvector('english', title || ' ' || subject || ' ' || COALESCE(author,'')))
+  USING GIN (to_tsvector('simple', title || ' ' || subject || ' ' || COALESCE(author,'')))
   WHERE is_deleted = false;
 ```
 
-### Pattern 6 — JSONB GIN indexes (MCQ options querying)
+**Note on language config:** `'simple'` is used instead of `'english'` throughout. English config applies stemming (e.g. "running" → "run") which corrupts proper nouns. `'simple'` tokenises and lowercases only — correct for names, emails, and titles.
+
+### Pattern 6 — JSONB GIN indexes
+
+**Not used.** The following indexes were considered but deliberately omitted:
+
 ```sql
-CREATE INDEX idx_questions_options ON assessment_questions USING GIN (options);
-CREATE INDEX idx_submissions_answers ON submissions USING GIN (answers);
+-- REMOVED: assessment_questions.options — questions are always fetched by assessment_id,
+-- never searched inside options JSONB. GIN here adds write overhead for zero query benefit.
+
+-- REMOVED: submissions.answers — submissions are always fetched by assessment_id or student_id,
+-- never searched inside the answers field.
 ```
+
+If a future use case genuinely requires JSONB search, add these indexes at that point.
 
 ---
 
@@ -828,3 +884,13 @@ CREATE INDEX idx_submissions_answers ON submissions USING GIN (answers);
 | `notification_recipients.is_dismissed` | Student dismiss removes from their view only — other students unaffected |
 | `users.email UNIQUE` globally | Login lookup is global; prevents same email in two institutes |
 | Auth token fields on `users` table | Verification + reset tokens stored hashed; `must_change_password` for new students |
+| `CHECK` constraints on all enum/status columns | DB-level guard against silent data corruption from application bugs; last line of defense |
+| `payments.month CHECK (day = 1)` | Enforces that month is always the 1st — prevents off-by-one bugs in cron and date arithmetic |
+| `correct_option` is sole truth for MCQ answer | `is_correct` removed from `options` JSONB — two sources of truth would allow drift; derived at query time |
+| No GIN on `options` or `answers` JSONB | These are always fetched by FK, never searched inside; GIN would add write overhead with no read benefit |
+| Full-text search uses `'simple'` language config | `'english'` applies stemming which corrupts Indian proper nouns; `'simple'` tokenises and lowercases only |
+| Trigram index for phone search | GIN full-text cannot match partial phone numbers; `pg_trgm` handles prefix/substring matching correctly |
+| `payments.reference VARCHAR(100)` | Stores UPI/NEFT/cash receipt reference numbers; prevents `notes` becoming a structured data dump |
+| `submissions.evaluation_type` | Distinguishes system auto-evaluation (MCQ close) from manual admin evaluation; `evaluated_by = NULL` is ambiguous without it |
+| `sessions` table is audit-only | Single-session enforcement uses `users.session_id`; `sessions` is a security audit log, not queried in the guard pipeline |
+| `assessment_questions` no soft delete | Questions hard-deleted; service blocks deletion on published/active/closed assessments to protect `submissions.answers` JSONB integrity |
