@@ -1,4 +1,4 @@
-# IMS Portal — Database Schema (Section 2)
+# Teachly — Database Schema (Section 2)
 
 **Hosted on:** Supabase PostgreSQL (dev: local PostgreSQL)
 **Accessed by:** NestJS backend only — frontend never connects directly

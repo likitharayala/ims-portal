@@ -1,4 +1,4 @@
-# IMS Portal — Architecture Weakness Analysis (Section 8)
+# Teachly — Architecture Weakness Analysis (Section 8)
 
 **Reviewer perspective:** Senior architect at a high-scale SaaS company.
 **Rating scale:** 🔴 Critical · 🟠 High · 🟡 Medium · 🟢 Low

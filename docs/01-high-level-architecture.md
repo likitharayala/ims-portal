@@ -1,6 +1,6 @@
-# IMS Portal — High Level Architecture (Section 1)
+# Teachly — High Level Architecture (Section 1)
 
-**Source of truth:** IMS Portal Requirements Summary
+**Source of truth:** Teachly Requirements Summary
 **Hard rule enforced throughout:** Frontend must never access the database directly. Every operation goes through the NestJS backend API.
 
 ---
@@ -530,7 +530,7 @@ Two environments with distinct infrastructure:
 │  MINIO_ENDPOINT=...                                             │
 │  MINIO_ACCESS_KEY=...                                           │
 │  MINIO_SECRET_KEY=...                                           │
-│  MINIO_BUCKET_NAME=ims-portal                                   │
+│  MINIO_BUCKET_NAME=teachly                                   │
 │  OPENAI_API_KEY=...                                             │
 │  FRONTEND_URL=https://your-domain.com                           │
 │  APP_ENV=production                                             │

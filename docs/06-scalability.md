@@ -1,4 +1,4 @@
-# IMS Portal — Scalability Architecture (Section 6)
+# Teachly — Scalability Architecture (Section 6)
 
 **Design target:** Thousands of institutes, each with hundreds of students, running concurrently on shared infrastructure. Multi-tenant system where one institute's load spike must not degrade another's experience.
 
@@ -525,7 +525,7 @@ WITH QUEUE:
 Traditional session-based apps need sticky sessions (same user → same server)
 because session state is stored in process memory.
 
-IMS Portal is stateless by design:
+Teachly is stateless by design:
   ✓ Session state in Redis (all instances read same Redis)
   ✓ Rate limit counters in Redis (all instances share same counters)
   ✓ Feature flags cached in Redis (all instances share same flags)
@@ -773,7 +773,7 @@ CONCERN: GIN indexes are expensive to update (every text mutation rebuilds GIN e
 MITIGATION:
   fastupdate = on (PostgreSQL default) — GIN defers updates to a pending list,
   batches them at query time or when threshold reached.
-  Acceptable for IMS Portal (student records don't update text fields frequently).
+  Acceptable for Teachly (student records don't update text fields frequently).
 
 CONCERN: Partial indexes grow as active records grow
 

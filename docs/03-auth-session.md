@@ -2,7 +2,7 @@
 
 ## Overview
 
-The IMS Portal authentication system handles two user types (Admin and Student) with different registration flows, shared JWT-based session management, and strict single active session enforcement.
+The Teachly authentication system handles two user types (Admin and Student) with different registration flows, shared JWT-based session management, and strict single active session enforcement.
 
 **Email service:** All auth emails (verification, password reset) are sent via **Nodemailer + Gmail SMTP**. Configure via `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` environment variables.
 

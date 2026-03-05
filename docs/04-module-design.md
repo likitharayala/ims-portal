@@ -1,4 +1,4 @@
-# IMS Portal — Backend Module Design (Section 4)
+# Teachly — Backend Module Design (Section 4)
 
 **Pattern:** Every module follows NestJS layered architecture → `Controller → Service → Repository`
 **Hard rules applied to every module:**

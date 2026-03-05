@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-IMS Portal is a multi-tenant SaaS Institute Management System for tuition centres and small institutes. Each institute registers, selects features, and gets a dynamically configured portal.
+Teachly is a multi-tenant SaaS Institute Management System for tuition centres and small institutes. Each institute registers, selects features, and gets a dynamically configured portal.
 
 ---
 
