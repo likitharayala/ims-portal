@@ -8,6 +8,29 @@ Teachly is a multi-tenant SaaS Institute Management System for tuition centres a
 
 ---
 
+## Commands
+
+```bash
+# Backend
+cd backend
+npm run start:dev          # start NestJS dev server (watch mode)
+npm run build              # production build
+npx prisma migrate dev --name <name>   # create + apply migration
+npx prisma generate        # regenerate Prisma client after schema change
+npx prisma validate        # validate schema
+npx prisma migrate status  # check pending migrations
+npx jest src/<module>/     # run tests for one module
+npx jest --coverage        # full test suite with coverage
+
+# Frontend
+cd frontend
+npm run dev                # start Next.js dev server
+npm run build              # production build
+npm run lint               # ESLint check
+```
+
+---
+
 ## Technology Stack
 
 | Layer | Technology |
@@ -20,6 +43,87 @@ Teachly is a multi-tenant SaaS Institute Management System for tuition centres a
 | File URLs | Pre-signed, time-limited (15 min expiry) — never permanent public URLs |
 | Cache | Redis Phase 2+ |
 | AI | OpenAI free tier → Ollama/LLaMA |
+
+---
+
+## Guard Chain
+
+Every protected NestJS route passes through guards in this exact order:
+
+```
+RateLimitGuard → InstituteContextMiddleware → JwtAuthGuard → RolesGuard → FeatureGuard
+```
+
+- `InstituteContextMiddleware` sets `req.instituteId` from the JWT — this is the **only** source of `instituteId`
+- `JwtAuthGuard` verifies signature + compares `session_id` in JWT vs `users.session_id` in DB
+- `RolesGuard` checks `@Roles(Role.Admin)` or `@Roles(Role.Student)` decorator
+- `FeatureGuard` checks `@RequiresFeature(Feature.X)` — returns 403 if feature disabled
+- Public routes bypass the chain via `@Public()` decorator
+
+---
+
+## Response Envelope
+
+All API responses use this shape — no exceptions:
+
+```typescript
+// Success
+{ success: true, data: T }
+{ success: true, data: T, meta: { total: number, page: number, pageSize: number } }
+
+// Error (formatted by global exception filter)
+{ success: false, error: { code: string, message: string } }
+```
+
+NestJS exception → HTTP status mapping:
+```
+NotFoundException      → 404
+ConflictException      → 409
+BadRequestException    → 400
+ForbiddenException     → 403
+UnauthorizedException  → 401
+```
+
+Never throw raw `Error` — always use NestJS exceptions.
+
+---
+
+## Key Code Patterns
+
+```typescript
+// instituteId always comes from req, never from body/params
+async create(instituteId: string, userId: string, dto: CreateXDto) { ... }
+
+// Audit log wrapped in try/catch — a failed audit log must never fail the operation
+try {
+  await this.auditLog.record({ instituteId, userId, action: 'CREATE_X', targetId: record.id, newValues: record });
+} catch {}
+
+// Single-record fetch MUST scope by instituteId (prevents IDOR)
+const record = await this.prisma.x.findFirst({
+  where: { id, instituteId, isDeleted: false }
+});
+if (!record) throw new NotFoundException('X not found');
+```
+
+---
+
+## Agents and Skills
+
+Invoke these before writing code — they prevent rework:
+
+| When | Use |
+|---|---|
+| Planning any feature touching > 1 file | `feature-architect` agent |
+| Adding/modifying Prisma schema | `db-architect` agent |
+| After writing a module | `code-reviewer` agent |
+| Slow endpoint or cron | `performance-optimizer` agent |
+| New auth, upload, or data-access code | `security-reviewer` agent |
+| Scaffolding a new NestJS module | `/create-module` skill |
+| Writing API docs | `/document-endpoint` skill |
+| Creating a migration | `/create-migration` skill |
+| Pre-release checks | `/prepare-release` skill |
+| Security scan | `/security-audit` skill |
 
 ---
 
@@ -134,7 +238,7 @@ All timestamps stored UTC. All UI displays in **IST (UTC+5:30)**. Assessment tim
 | Default sort — students | Join date descending |
 | Search fields — students | Name, email, phone, roll number, class, school (real-time) |
 | Student grid columns | Name, Email, Phone, Class, School, Parent Name, Parent Phone, Joined Date + credential status indicator |
-| Soft delete — students | Permanent — cannot be restored. Active sessions invalidated immediately on delete |
+| Soft delete — students | Soft-deleted (isDeleted = true) — NOT hard-deleted. But reinstate is not supported in V1 — once deleted the admin cannot undo it through the UI. Active sessions invalidated immediately on delete |
 | Dashboard stats caching | Phase 1: fresh on load. Phase 2: Redis 5-min TTL |
 | Upcoming assessments | All published or active assessments (no date range filter) |
 | Pending payments card | Shows both count of students with pending/overdue AND total amount |
