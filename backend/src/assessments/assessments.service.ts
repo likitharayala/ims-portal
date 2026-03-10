@@ -691,7 +691,7 @@ export class AssessmentsService {
     if (!assessment) throw new NotFoundException('Assessment not found');
 
     return this.prisma.assessmentExtraTime.findMany({
-      where: { assessmentId, instituteId },
+      where: { assessmentId, instituteId, student: { isDeleted: false } },
       include: {
         student: {
           include: { user: { select: { name: true, email: true } } },
@@ -709,7 +709,12 @@ export class AssessmentsService {
     studentId: string,
   ) {
     const record = await this.prisma.assessmentExtraTime.findFirst({
-      where: { assessmentId, studentId, instituteId },
+      where: {
+        assessmentId,
+        studentId,
+        instituteId,
+        student: { isDeleted: false },
+      },
     });
     if (!record) throw new NotFoundException('Extra time record not found');
 

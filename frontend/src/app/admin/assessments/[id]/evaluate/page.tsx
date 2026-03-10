@@ -50,6 +50,9 @@ export default function EvaluateAssessmentPage() {
   const extraTimeMap = new Map(
     (extraTimes ?? []).map((et) => [et.studentId, et]),
   );
+  const visibleSubmissions = (submissions ?? []).filter(
+    (submission) => !submission.studentIsDeleted,
+  );
 
   const handleReleaseAll = async () => {
     try {
@@ -184,7 +187,7 @@ export default function EvaluateAssessmentPage() {
             <div key={i} className="animate-pulse h-14 bg-slate-100 rounded-xl" />
           ))}
         </div>
-      ) : !submissions || submissions.length === 0 ? (
+      ) : visibleSubmissions.length === 0 ? (
         <div className="bg-white rounded-xl border border-slate-200 border-dashed p-12 text-center">
           <p className="text-slate-500 text-sm">No submissions yet.</p>
         </div>
@@ -215,19 +218,12 @@ export default function EvaluateAssessmentPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {(submissions as Submission[]).map((s) => {
+              {visibleSubmissions.map((s) => {
                 const et = extraTimeMap.get(s.studentId);
                 return (
                   <tr key={s.id} className="hover:bg-slate-50">
                     <td className="px-4 py-3">
-                      <p className="font-medium text-slate-800">
-                        {s.studentName}
-                        {s.studentIsDeleted && (
-                          <span className="ml-1.5 text-xs bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-normal">
-                            deleted
-                          </span>
-                        )}
-                      </p>
+                      <p className="font-medium text-slate-800">{s.studentName}</p>
                       <p className="text-xs text-slate-400">{s.studentEmail}</p>
                     </td>
                     <td className="px-4 py-3 text-slate-600 hidden sm:table-cell">

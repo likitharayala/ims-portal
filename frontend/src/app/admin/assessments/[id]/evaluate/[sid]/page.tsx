@@ -227,6 +227,17 @@ export default function EvaluateSubmissionPage() {
     );
   }
 
+  if ((submission.student as any)?.isDeleted) {
+    return (
+      <div className="p-6 text-slate-500">
+        Submission not found.{' '}
+        <Link href={`/admin/assessments/${id}/evaluate`} className="text-blue-600 hover:underline">
+          Back
+        </Link>
+      </div>
+    );
+  }
+
   const progressPct = maxTotal > 0 ? Math.round((liveTotal / maxTotal) * 100) : 0;
 
   return (
@@ -244,11 +255,6 @@ export default function EvaluateSubmissionPage() {
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-slate-800 truncate">
             {submission.student?.user?.name ?? 'Student'}
-            {(submission.student as any)?.isDeleted && (
-              <span className="ml-1.5 text-xs bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-normal">
-                deleted
-              </span>
-            )}
           </p>
           <p className="text-xs text-slate-400 truncate">
             {submission.student?.user?.email} · Class {submission.student?.class}

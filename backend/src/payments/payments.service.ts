@@ -72,14 +72,7 @@ export class PaymentsService {
       ...(query.month && { month: query.month }),
       ...(query.year && { year: query.year }),
       ...(status && { status }),
-      // IDOR + deleted-student visibility rule
-      OR: [
-        { student: { isDeleted: false, ...(query.class && { class: query.class }) } },
-        {
-          student: { isDeleted: true, ...(query.class && { class: query.class }) },
-          status: { in: [PaymentStatus.pending, PaymentStatus.overdue] },
-        },
-      ],
+      student: { isDeleted: false, ...(query.class && { class: query.class }) },
     };
 
     return where;
@@ -133,7 +126,7 @@ export class PaymentsService {
   async getFilterOptions(instituteId: string) {
     const [monthYearRows, classRows] = await Promise.all([
       this.prisma.payment.findMany({
-        where: { instituteId },
+        where: { instituteId, student: { isDeleted: false } },
         select: { month: true, year: true },
         distinct: ['month', 'year'],
         orderBy: [{ year: 'desc' }, { month: 'desc' }],
@@ -396,6 +389,7 @@ export class PaymentsService {
           where: {
             instituteId,
             status: PaymentStatus.overdue,
+            student: { isDeleted: false },
           },
         }),
         this.prisma.payment.aggregate({
@@ -410,6 +404,7 @@ export class PaymentsService {
           where: {
             instituteId,
             status: PaymentStatus.overdue,
+            student: { isDeleted: false },
           },
           _sum: { amount: true },
         }),

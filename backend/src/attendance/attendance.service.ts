@@ -141,9 +141,10 @@ export class AttendanceService {
       where: {
         instituteId,
         date: { gte: from, lte: to },
-        ...(query.class
-          ? { student: { class: query.class } }
-          : {}),
+        student: {
+          isDeleted: false,
+          ...(query.class ? { class: query.class } : {}),
+        },
       },
       select: { date: true },
       distinct: ['date'],
@@ -317,7 +318,11 @@ export class AttendanceService {
 
     // Total days = distinct days recorded for ANY student in institute for this month
     const totalDays = await this.prisma.attendance.findMany({
-      where: { instituteId, date: { gte: from, lte: to } },
+      where: {
+        instituteId,
+        date: { gte: from, lte: to },
+        student: { isDeleted: false },
+      },
       select: { date: true },
       distinct: ['date'],
     }).then((r) => r.length);

@@ -26,7 +26,7 @@ export class EvaluationService {
     if (!assessment) throw new NotFoundException('Assessment not found');
 
     const submissions = await this.prisma.submission.findMany({
-      where: { assessmentId, instituteId },
+      where: { assessmentId, instituteId, student: { isDeleted: false } },
       include: {
         student: {
           include: {
@@ -60,7 +60,12 @@ export class EvaluationService {
     submissionId: string,
   ) {
     const submission = await this.prisma.submission.findFirst({
-      where: { id: submissionId, assessmentId, instituteId },
+      where: {
+        id: submissionId,
+        assessmentId,
+        instituteId,
+        student: { isDeleted: false },
+      },
       include: {
         student: {
           include: {
@@ -88,7 +93,12 @@ export class EvaluationService {
     dto: EnterMarksDto,
   ) {
     const submission = await this.prisma.submission.findFirst({
-      where: { id: submissionId, assessmentId, instituteId },
+      where: {
+        id: submissionId,
+        assessmentId,
+        instituteId,
+        student: { isDeleted: false },
+      },
       include: {
         assessment: {
           include: { questions: true },
@@ -137,7 +147,12 @@ export class EvaluationService {
     submissionId: string,
   ) {
     const submission = await this.prisma.submission.findFirst({
-      where: { id: submissionId, assessmentId, instituteId },
+      where: {
+        id: submissionId,
+        assessmentId,
+        instituteId,
+        student: { isDeleted: false },
+      },
       include: {
         assessment: {
           include: { questions: true },
@@ -203,7 +218,12 @@ export class EvaluationService {
     submissionId: string,
   ) {
     const submission = await this.prisma.submission.findFirst({
-      where: { id: submissionId, assessmentId, instituteId },
+      where: {
+        id: submissionId,
+        assessmentId,
+        instituteId,
+        student: { isDeleted: false },
+      },
     });
     if (!submission) throw new NotFoundException('Submission not found');
 
@@ -225,7 +245,12 @@ export class EvaluationService {
     if (!assessment) throw new NotFoundException('Assessment not found');
 
     await this.prisma.submission.updateMany({
-      where: { assessmentId, instituteId, isFinalized: true },
+      where: {
+        assessmentId,
+        instituteId,
+        isFinalized: true,
+        student: { isDeleted: false },
+      },
       data: { resultReleased: true },
     });
 
@@ -276,7 +301,7 @@ export class EvaluationService {
     if (!assessment) throw new NotFoundException('Assessment not found');
 
     const submissions = await this.prisma.submission.findMany({
-      where: { assessmentId, instituteId },
+      where: { assessmentId, instituteId, student: { isDeleted: false } },
       select: {
         status: true,
         totalMarks: true,
@@ -347,7 +372,7 @@ export class EvaluationService {
     if (!student) throw new NotFoundException('Student not found');
 
     const submissions = await this.prisma.submission.findMany({
-      where: { studentId, instituteId },
+      where: { studentId, instituteId, student: { isDeleted: false } },
       include: {
         assessment: {
           select: {
@@ -387,7 +412,13 @@ export class EvaluationService {
     if (!student) throw new NotFoundException('Student profile not found');
 
     const submissions = await this.prisma.submission.findMany({
-      where: { studentId: student.id, instituteId, resultReleased: true, isFinalized: true },
+      where: {
+        studentId: student.id,
+        instituteId,
+        resultReleased: true,
+        isFinalized: true,
+        student: { isDeleted: false },
+      },
       include: {
         assessment: {
           select: {
@@ -423,7 +454,7 @@ export class EvaluationService {
     if (!student) throw new NotFoundException('Student profile not found');
 
     const submissions = await this.prisma.submission.findMany({
-      where: { studentId: student.id, instituteId },
+      where: { studentId: student.id, instituteId, student: { isDeleted: false } },
       include: {
         assessment: {
           select: {
