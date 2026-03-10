@@ -56,6 +56,10 @@ export default function AdminDashboardPage() {
     },
   });
 
+  const overduePaymentsCount = stats?.pendingPayments.count ?? 0;
+  const assessmentsEndingToday = 0;
+  const attendancePendingCount = 0;
+
   return (
     <div className="p-6 max-w-6xl mx-auto">
       {/* Welcome */}
@@ -110,6 +114,48 @@ export default function AdminDashboardPage() {
             loading={isLoading}
           />
         </Link>
+      </div>
+
+      {/* Needs attention today */}
+      <div className="mb-8">
+        <div className="bg-white rounded-xl border border-slate-200 p-5">
+          <h2 className="text-base font-semibold text-slate-800 mb-4">
+            Needs Attention Today
+          </h2>
+
+          <div className="space-y-3">
+            <div className="flex items-center gap-3 rounded-lg border border-red-100 bg-red-50 px-4 py-3">
+              <span className="text-lg">⚠</span>
+              <p className="text-sm text-slate-700">
+                <span className="font-semibold text-slate-900">
+                  {overduePaymentsCount}
+                </span>{' '}
+                payments overdue
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3 rounded-lg border border-amber-100 bg-amber-50 px-4 py-3">
+              <span className="text-lg">📝</span>
+              <p className="text-sm text-slate-700">
+                <span className="font-semibold text-slate-900">
+                  {assessmentsEndingToday}
+                </span>{' '}
+                assessment{assessmentsEndingToday === 1 ? '' : 's'} ending today
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3 rounded-lg border border-blue-100 bg-blue-50 px-4 py-3">
+              <span className="text-lg">📌</span>
+              <p className="text-sm text-slate-700">
+                Attendance not marked for{' '}
+                <span className="font-semibold text-slate-900">
+                  {attendancePendingCount}
+                </span>{' '}
+                batch{attendancePendingCount === 1 ? '' : 'es'}
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Empty state for new institutes */}

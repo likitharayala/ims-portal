@@ -10,6 +10,7 @@
  */
 
 import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 
 interface Props {
   value: string;           // "YYYY-MM-DDTHH:mm" in IST, or ''
@@ -111,6 +112,12 @@ export function DateTimePicker({ value, onChange, placeholder = 'Select date & t
   const [selPeriod, setSelPeriod] = useState<'AM' | 'PM' | null>(parsed?.period ?? null);
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const popupRef = useRef<HTMLDivElement>(null);
+  const [popupStyle, setPopupStyle] = useState<{ top: number; left: number }>({
+    top: 0,
+    left: 0,
+  });
 
   // Sync internal state when value prop changes externally
   useEffect(() => {
@@ -134,12 +141,49 @@ export function DateTimePicker({ value, onChange, placeholder = 'Select date & t
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      const clickedTrigger = containerRef.current?.contains(target);
+      const clickedPopup = popupRef.current?.contains(target);
+      if (!clickedTrigger && !clickedPopup) {
         setOpen(false);
       }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const updatePopupPosition = () => {
+      if (!triggerRef.current) return;
+
+      const rect = triggerRef.current.getBoundingClientRect();
+      const popupWidth = 320;
+      const popupHeight = 540;
+      const gutter = 16;
+
+      let left = rect.left;
+      if (left + popupWidth > window.innerWidth - gutter) {
+        left = Math.max(gutter, window.innerWidth - popupWidth - gutter);
+      }
+
+      let top = rect.bottom + 8;
+      if (top + popupHeight > window.innerHeight - gutter) {
+        top = Math.max(gutter, rect.top - popupHeight - 8);
+      }
+
+      setPopupStyle({ top, left });
+    };
+
+    updatePopupPosition();
+    window.addEventListener('resize', updatePopupPosition);
+    window.addEventListener('scroll', updatePopupPosition, true);
+
+    return () => {
+      window.removeEventListener('resize', updatePopupPosition);
+      window.removeEventListener('scroll', updatePopupPosition, true);
+    };
   }, [open]);
 
   // Emit value (no auto-close — user must click Confirm)
@@ -195,6 +239,7 @@ export function DateTimePicker({ value, onChange, placeholder = 'Select date & t
     <div ref={containerRef} className="relative">
       {/* Trigger input */}
       <button
+        ref={triggerRef}
         id={id}
         type="button"
         onClick={() => setOpen((o) => !o)}
@@ -223,8 +268,12 @@ export function DateTimePicker({ value, onChange, placeholder = 'Select date & t
       )}
 
       {/* Popup */}
-      {open && (
-        <div className="absolute z-50 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl p-4 w-[320px]">
+      {open && typeof document !== 'undefined' && createPortal(
+        <div
+          ref={popupRef}
+          style={{ top: popupStyle.top, left: popupStyle.left }}
+          className="fixed z-[70] bg-white border border-slate-200 rounded-xl shadow-xl p-4 w-[320px]"
+        >
 
           {/* Calendar header */}
           <div className="flex items-center justify-between mb-3">
@@ -370,7 +419,8 @@ export function DateTimePicker({ value, onChange, placeholder = 'Select date & t
           >
             Confirm
           </button>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

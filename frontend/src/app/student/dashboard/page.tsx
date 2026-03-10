@@ -48,6 +48,9 @@ export default function StudentDashboardPage() {
     },
   });
 
+  const nextAssessment = data?.upcomingAssessments[0];
+  const nextAssessmentLocked = nextAssessment?.status === 'published';
+
   return (
     <div className="p-6 max-w-5xl mx-auto">
       {/* Welcome */}
@@ -56,6 +59,65 @@ export default function StudentDashboardPage() {
           Hi, {user?.name?.split(' ')[0]} 👋
         </h1>
         <p className="text-sm text-slate-500 mt-1">Here's your overview for today.</p>
+      </div>
+
+      {/* Next assessment */}
+      <div className="mb-8">
+        <div className="bg-white rounded-xl border border-slate-200 p-6">
+          {isLoading ? (
+            <div className="animate-pulse space-y-3">
+              <div className="h-4 w-32 bg-slate-200 rounded" />
+              <div className="h-7 w-56 bg-slate-100 rounded" />
+              <div className="h-4 w-40 bg-slate-100 rounded" />
+              <div className="h-10 w-36 bg-slate-200 rounded-lg" />
+            </div>
+          ) : nextAssessment ? (
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium text-slate-500 mb-2">Next Assessment</p>
+                <h2 className="text-xl font-semibold text-slate-800">{nextAssessment.title}</h2>
+                <p className="text-sm text-slate-500 mt-1">
+                  {nextAssessment.startAt
+                    ? toIST(nextAssessment.startAt, 'dd MMMM — hh:mm a')
+                    : 'Schedule to be announced'}
+                </p>
+              </div>
+
+              {nextAssessmentLocked ? (
+                <button
+                  type="button"
+                  disabled
+                  className="inline-flex items-center justify-center rounded-lg bg-slate-100 px-4 py-2.5 text-sm font-medium text-slate-400 cursor-not-allowed"
+                >
+                  Starts Soon
+                </button>
+              ) : (
+                <Link
+                  href={`/student/assessments/${nextAssessment.id}`}
+                  className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700"
+                >
+                  Start Assessment
+                </Link>
+              )}
+            </div>
+          ) : (
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium text-slate-500 mb-2">Next Assessment</p>
+                <h2 className="text-xl font-semibold text-slate-800">No upcoming assessments</h2>
+                <p className="text-sm text-slate-500 mt-1">
+                  New assessments will appear here when your institute publishes them.
+                </p>
+              </div>
+              <Link
+                href="/student/assessments"
+                className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700"
+              >
+                View Assessments
+              </Link>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Summary cards */}
