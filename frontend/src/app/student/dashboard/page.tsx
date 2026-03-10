@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/lib/auth-store';
@@ -59,53 +60,59 @@ export default function StudentDashboardPage() {
 
       {/* Summary cards */}
       <div className="grid grid-cols-3 gap-4 mb-8">
-        <div className="bg-white rounded-xl border border-slate-200 p-5 text-center">
-          {isLoading ? (
-            <div className="animate-pulse space-y-2">
-              <div className="h-8 w-10 bg-slate-200 rounded mx-auto" />
-              <div className="h-3 w-24 bg-slate-100 rounded mx-auto" />
-            </div>
-          ) : (
-            <>
-              <p className="text-3xl font-bold text-blue-700">
-                {data?.upcomingAssessments.length ?? 0}
-              </p>
-              <p className="text-xs text-slate-500 mt-1">Upcoming Assessments</p>
-            </>
-          )}
-        </div>
+        <Link href="/student/assessments" className="block">
+          <div className="bg-white rounded-xl border border-slate-200 p-5 text-center">
+            {isLoading ? (
+              <div className="animate-pulse space-y-2">
+                <div className="h-8 w-10 bg-slate-200 rounded mx-auto" />
+                <div className="h-3 w-24 bg-slate-100 rounded mx-auto" />
+              </div>
+            ) : (
+              <>
+                <p className="text-3xl font-bold text-blue-700">
+                  {data?.upcomingAssessments.length ?? 0}
+                </p>
+                <p className="text-xs text-slate-500 mt-1">Upcoming Assessments</p>
+              </>
+            )}
+          </div>
+        </Link>
 
-        <div className="bg-white rounded-xl border border-slate-200 p-5 text-center">
-          {isLoading ? (
-            <div className="animate-pulse space-y-2">
-              <div className="h-8 w-10 bg-slate-200 rounded mx-auto" />
-              <div className="h-3 w-24 bg-slate-100 rounded mx-auto" />
-            </div>
-          ) : (
-            <>
-              <p className="text-3xl font-bold text-amber-600">
-                {data?.unreadNotifications ?? 0}
-              </p>
-              <p className="text-xs text-slate-500 mt-1">Unread Notifications</p>
-            </>
-          )}
-        </div>
+        <Link href="/student/notifications" className="block">
+          <div className="bg-white rounded-xl border border-slate-200 p-5 text-center">
+            {isLoading ? (
+              <div className="animate-pulse space-y-2">
+                <div className="h-8 w-10 bg-slate-200 rounded mx-auto" />
+                <div className="h-3 w-24 bg-slate-100 rounded mx-auto" />
+              </div>
+            ) : (
+              <>
+                <p className="text-3xl font-bold text-amber-600">
+                  {data?.unreadNotifications ?? 0}
+                </p>
+                <p className="text-xs text-slate-500 mt-1">Unread Notifications</p>
+              </>
+            )}
+          </div>
+        </Link>
 
-        <div className="bg-white rounded-xl border border-slate-200 p-5 text-center">
-          {isLoading ? (
-            <div className="animate-pulse space-y-2">
-              <div className="h-8 w-10 bg-slate-200 rounded mx-auto" />
-              <div className="h-3 w-24 bg-slate-100 rounded mx-auto" />
-            </div>
-          ) : (
-            <>
-              <p className="text-3xl font-bold text-purple-700">
-                {data?.recentMaterials.length ?? 0}
-              </p>
-              <p className="text-xs text-slate-500 mt-1">Recent Materials</p>
-            </>
-          )}
-        </div>
+        <Link href="/student/materials" className="block">
+          <div className="bg-white rounded-xl border border-slate-200 p-5 text-center">
+            {isLoading ? (
+              <div className="animate-pulse space-y-2">
+                <div className="h-8 w-10 bg-slate-200 rounded mx-auto" />
+                <div className="h-3 w-24 bg-slate-100 rounded mx-auto" />
+              </div>
+            ) : (
+              <>
+                <p className="text-3xl font-bold text-purple-700">
+                  {data?.recentMaterials.length ?? 0}
+                </p>
+                <p className="text-xs text-slate-500 mt-1">Recent Materials</p>
+              </>
+            )}
+          </div>
+        </Link>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
