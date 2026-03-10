@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+/* ── Teachly brand palette (derived from logo) ─────────────────────────────
+   Primary: Deep Navy  #1B3A6B
+   Accent1: Sky Blue   #7BC8E8
+   Accent2: Green      #6BBF6A
+   Accent3: Amber      #F5A623
+   ─────────────────────────────────────────────────────────────────────── */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-inter);
+
+  /* Override the full blue scale to navy so every bg-blue-* / text-blue-*
+     automatically uses the Teachly brand colour — no component changes needed */
+  --color-blue-50:  #EEF4FB;
+  --color-blue-100: #D6E4F5;
+  --color-blue-200: #B8CFE8;
+  --color-blue-300: #7BC8E8;
+  --color-blue-400: #5B8AC5;
+  --color-blue-500: #2451A0;
+  --color-blue-600: #1B3A6B;
+  --color-blue-700: #162f58;
+  --color-blue-800: #0f2440;
+  --color-blue-900: #0a1a2e;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-inter), Inter, Arial, Helvetica, sans-serif;
+}
+
+@keyframes shrink {
+  from { width: 100%; }
+  to   { width: 0%; }
+}
+
+input:not(:disabled), textarea:not(:disabled) {
+  color: #000000 !important;
+}

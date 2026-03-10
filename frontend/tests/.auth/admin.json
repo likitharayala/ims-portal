@@ -1,0 +1,43 @@
+{
+  "cookies": [
+    {
+      "name": "accessToken",
+      "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNDBiMzY0Ni0wYjE3LTQ3MzAtYmZiYi03MGI4YjRlZmUwZmUiLCJpbnN0aXR1dGVfaWQiOiIyOTY5NjNkNS1jNmEyLTRjYjktOTI5Ni03MjhkODBhZGE5YzEiLCJyb2xlIjoiYWRtaW4iLCJzZXNzaW9uX2lkIjoiMDkwYTFhNDktYTI5MC00MWY2LThkMjEtZjJjZTgwZTI3N2NlIiwiaWF0IjoxNzcyODI1MTQxLCJleHAiOjE3NzI4MjYwNDF9.dExC4HNq53MacFgd-T9A7_FXiNMrYBR5wVLWkS0qvG8",
+      "domain": "localhost",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "userRole",
+      "value": "admin",
+      "domain": "localhost",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    }
+  ],
+  "origins": [
+    {
+      "origin": "http://localhost:3000",
+      "localStorage": [
+        {
+          "name": "accessToken",
+          "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNDBiMzY0Ni0wYjE3LTQ3MzAtYmZiYi03MGI4YjRlZmUwZmUiLCJpbnN0aXR1dGVfaWQiOiIyOTY5NjNkNS1jNmEyLTRjYjktOTI5Ni03MjhkODBhZGE5YzEiLCJyb2xlIjoiYWRtaW4iLCJzZXNzaW9uX2lkIjoiMDkwYTFhNDktYTI5MC00MWY2LThkMjEtZjJjZTgwZTI3N2NlIiwiaWF0IjoxNzcyODI1MTQxLCJleHAiOjE3NzI4MjYwNDF9.dExC4HNq53MacFgd-T9A7_FXiNMrYBR5wVLWkS0qvG8"
+        },
+        {
+          "name": "user",
+          "value": "{\"id\":\"b40b3646-0b17-4730-bfbb-70b8b4efe0fe\",\"name\":\"test\",\"email\":\"lillyjoj1729@gmail.com\",\"role\":\"admin\",\"instituteId\":\"296963d5-c6a2-4cb9-9296-728d80ada9c1\",\"mustChangePassword\":false}"
+        },
+        {
+          "name": "refreshToken",
+          "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNDBiMzY0Ni0wYjE3LTQ3MzAtYmZiYi03MGI4YjRlZmUwZmUiLCJzZXNzaW9uX2lkIjoiMDkwYTFhNDktYTI5MC00MWY2LThkMjEtZjJjZTgwZTI3N2NlIiwidHlwZSI6InJlZnJlc2giLCJpYXQiOjE3NzI4MjUxNDEsImV4cCI6MTc3MzQyOTk0MX0.nfon9EHS7sDhmlgiinZ6SQSssIkBU0JYSe0ljP2DUn8"
+        }
+      ]
+    }
+  ]
+}
