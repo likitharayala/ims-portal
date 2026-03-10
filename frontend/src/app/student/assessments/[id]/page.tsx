@@ -23,6 +23,12 @@ export default function AssessmentInstructionsPage() {
     !!extraTime?.effectiveEndAt &&
     new Date(extraTime.effectiveEndAt) > new Date();
 
+  // When extra time is granted while student is on this page, refetch submission status
+  // Must be above early returns to satisfy Rules of Hooks
+  useEffect(() => {
+    if (hasActiveExtraTime) refetchSubmission();
+  }, [hasActiveExtraTime]); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (isLoading) {
     return (
       <div className="p-6 max-w-2xl mx-auto">
@@ -47,11 +53,6 @@ export default function AssessmentInstructionsPage() {
   const inProgress = submission?.status === 'in_progress';
   // Can resume if submitted (not evaluated) and has active extra time
   const canResume = submission?.status === 'submitted' && hasActiveExtraTime;
-
-  // When extra time is granted while student is on this page, refetch submission status
-  useEffect(() => {
-    if (hasActiveExtraTime) refetchSubmission();
-  }, [hasActiveExtraTime]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleStart = async (mode: 'portal' | 'upload') => {
     setError('');

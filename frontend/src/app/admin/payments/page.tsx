@@ -56,7 +56,9 @@ function PaymentTable({
                 <p className="font-medium text-slate-800">
                   {p.student.user.name}
                   {p.student.isDeleted && (
-                    <span className="ml-1 text-xs text-slate-400">(deleted)</span>
+                    <span className="ml-1.5 text-xs bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-normal">
+                      deleted
+                    </span>
                   )}
                 </p>
               </td>

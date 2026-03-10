@@ -43,6 +43,7 @@ export class EvaluationService {
       studentName: s.student.user.name,
       studentEmail: s.student.user.email,
       studentClass: s.student.class,
+      studentIsDeleted: s.student.isDeleted,
       status: s.status,
       totalMarks: s.totalMarks,
       isFinalized: s.isFinalized,

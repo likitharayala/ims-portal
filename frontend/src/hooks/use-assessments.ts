@@ -48,6 +48,7 @@ export interface Submission {
   studentName: string;
   studentEmail: string;
   studentClass: string;
+  studentIsDeleted: boolean;
   status: 'in_progress' | 'submitted' | 'evaluated' | 'absent';
   totalMarks?: number;
   isFinalized: boolean;

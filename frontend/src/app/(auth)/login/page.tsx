@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/lib/auth-store';
 import { getApiError } from '@/lib/utils';
@@ -11,6 +12,7 @@ import type { AuthUser } from '@/lib/auth-store';
 export default function LoginPage() {
   const router = useRouter();
   const setAuth = useAuthStore((s) => s.setAuth);
+  const queryClient = useQueryClient();
 
   const [form, setForm] = useState({ emailOrPhone: '', password: '' });
   const [loading, setLoading] = useState(false);
@@ -35,6 +37,7 @@ export default function LoginPage() {
         user: AuthUser;
       };
 
+      queryClient.clear();
       setAuth(accessToken, refreshToken, user);
 
       // Set cookies for middleware
