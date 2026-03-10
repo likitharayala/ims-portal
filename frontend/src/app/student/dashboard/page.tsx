@@ -134,38 +134,58 @@ export default function StudentDashboardPage() {
             </div>
           ) : (
             <div className="space-y-3">
-              {data?.upcomingAssessments.map((a) => (
-                <Link
-                  key={a.id}
-                  href={`/student/assessments/${a.id}`}
-                  className="block bg-white rounded-xl border border-slate-200 p-4"
-                >
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <h3 className="font-medium text-slate-800 text-sm">{a.title}</h3>
-                    <span
-                      className={`flex-shrink-0 text-xs px-2 py-0.5 rounded-full font-medium ${
-                        STATUS_BADGE[a.status] ?? 'bg-slate-100 text-slate-600'
-                      }`}
+              {data?.upcomingAssessments.map((a) => {
+                const isLocked = a.status === 'published';
+                const cardContent = (
+                  <>
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <h3 className="font-medium text-slate-800 text-sm">{a.title}</h3>
+                      <span
+                        className={`flex-shrink-0 text-xs px-2 py-0.5 rounded-full font-medium ${
+                          STATUS_BADGE[a.status] ?? 'bg-slate-100 text-slate-600'
+                        }`}
+                      >
+                        {a.status}
+                      </span>
+                    </div>
+                    {a.subject && (
+                      <p className="text-xs text-slate-500 mb-2">{a.subject}</p>
+                    )}
+                    <div className="flex gap-4 text-xs text-slate-400">
+                      {a.startAt && (
+                        <span>Start: {toIST(a.startAt, 'dd MMM, hh:mm a')}</span>
+                      )}
+                      {a.endAt && (
+                        <span>End: {toIST(a.endAt, 'dd MMM, hh:mm a')}</span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Total marks: {a.totalMarks}
+                    </p>
+                  </>
+                );
+
+                if (isLocked) {
+                  return (
+                    <div
+                      key={a.id}
+                      className="bg-white rounded-xl border border-slate-200 p-4 cursor-not-allowed opacity-75 pointer-events-none"
                     >
-                      {a.status}
-                    </span>
-                  </div>
-                  {a.subject && (
-                    <p className="text-xs text-slate-500 mb-2">{a.subject}</p>
-                  )}
-                  <div className="flex gap-4 text-xs text-slate-400">
-                    {a.startAt && (
-                      <span>Start: {toIST(a.startAt, 'dd MMM, hh:mm a')}</span>
-                    )}
-                    {a.endAt && (
-                      <span>End: {toIST(a.endAt, 'dd MMM, hh:mm a')}</span>
-                    )}
-                  </div>
-                  <p className="text-xs text-slate-400 mt-1">
-                    Total marks: {a.totalMarks}
-                  </p>
-                </Link>
-              ))}
+                      {cardContent}
+                    </div>
+                  );
+                }
+
+                return (
+                  <Link
+                    key={a.id}
+                    href={`/student/assessments/${a.id}`}
+                    className="block bg-white rounded-xl border border-slate-200 p-4"
+                  >
+                    {cardContent}
+                  </Link>
+                );
+              })}
             </div>
           )}
         </div>
