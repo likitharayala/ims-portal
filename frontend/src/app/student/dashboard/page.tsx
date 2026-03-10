@@ -131,6 +131,12 @@ export default function StudentDashboardPage() {
           ) : data?.upcomingAssessments.length === 0 ? (
             <div className="bg-white rounded-xl border border-slate-200 border-dashed p-8 text-center">
               <p className="text-slate-400 text-sm">No upcoming assessments</p>
+              <Link
+                href="/student/assessments"
+                className="inline-flex items-center justify-center mt-4 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+              >
+                View Assessments
+              </Link>
             </div>
           ) : (
             <div className="space-y-3">
@@ -217,6 +223,12 @@ export default function StudentDashboardPage() {
           ) : data?.recentMaterials.length === 0 ? (
             <div className="bg-white rounded-xl border border-slate-200 border-dashed p-8 text-center">
               <p className="text-slate-400 text-sm">No materials uploaded yet</p>
+              <Link
+                href="/student/materials"
+                className="inline-flex items-center justify-center mt-4 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+              >
+                Browse Materials
+              </Link>
             </div>
           ) : (
             <div className="space-y-3">
