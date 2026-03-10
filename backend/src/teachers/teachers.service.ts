@@ -35,11 +35,19 @@ export class TeachersService {
 
   // ─── Admin: create/invite teacher ─────────────────────────────────────────
   async createTeacher(instituteId: string, adminId: string, dto: CreateTeacherDto) {
-    // Check email uniqueness within institute
+    // Email is globally unique in the users table, so check globally and surface
+    // a clear conflict before Prisma throws.
     const existing = await this.prisma.user.findFirst({
-      where: { email: dto.email, instituteId },
+      where: { email: dto.email },
     });
-    if (existing) throw new ConflictException('A user with this email already exists');
+    if (existing?.isDeleted) {
+      throw new ConflictException(
+        'A deleted user with this email already exists. Use a different email.',
+      );
+    }
+    if (existing) {
+      throw new ConflictException('A user with this email already exists');
+    }
 
     const teacherRole = await this.prisma.role.findFirst({ where: { name: 'teacher' } });
     if (!teacherRole) throw new NotFoundException('Teacher role not seeded');
@@ -153,15 +161,23 @@ export class TeachersService {
     });
     if (!teacher) throw new NotFoundException('Teacher not found');
 
-    // Soft delete teacher + invalidate session
+    const now = new Date();
+
+    // Soft delete teacher + linked user and invalidate the session.
     await this.prisma.$transaction([
       this.prisma.teacher.update({
         where: { id: teacherId },
-        data: { isDeleted: true, deletedAt: new Date(), deletedBy: adminId },
+        data: { isDeleted: true, deletedAt: now, deletedBy: adminId },
       }),
       this.prisma.user.update({
         where: { id: teacher.userId },
-        data: { sessionId: null },
+        data: {
+          isDeleted: true,
+          isActive: false,
+          deletedAt: now,
+          deletedBy: adminId,
+          sessionId: null,
+        },
       }),
     ]);
 
