@@ -4,9 +4,10 @@ import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  const isProduction = process.env.APP_ENV === 'production';
   const allowedOrigins = [
     process.env.FRONTEND_URL,
-    'http://localhost:3000',
+    !isProduction ? 'http://localhost:3000' : null,
   ].filter((origin): origin is string => Boolean(origin));
 
   // Global validation pipe
@@ -20,7 +21,34 @@ async function bootstrap() {
 
   // CORS — frontend domain only
   app.enableCors({
-    origin: [...allowedOrigins, /\.vercel\.app$/],
+    origin: (origin, callback) => {
+      if (!origin) {
+        callback(null, true);
+        return;
+      }
+
+      const normalizedOrigin = origin.replace(/\/$/, '');
+      const isAllowedOrigin = allowedOrigins.some(
+        (allowedOrigin) => allowedOrigin.replace(/\/$/, '') === normalizedOrigin,
+      );
+
+      let isVercelPreview = false;
+      try {
+        const parsedOrigin = new URL(origin);
+        isVercelPreview =
+          parsedOrigin.protocol === 'https:' &&
+          parsedOrigin.hostname.endsWith('.vercel.app');
+      } catch {
+        isVercelPreview = false;
+      }
+
+      if (isAllowedOrigin || isVercelPreview) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error('Not allowed by CORS'));
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
