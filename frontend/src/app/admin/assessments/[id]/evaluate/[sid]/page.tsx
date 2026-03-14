@@ -11,7 +11,7 @@ import {
 import type { AssessmentQuestion } from '@/hooks/use-assessments';
 import { Toast, useToast } from '@/components/ui/Toast';
 import { getApiError } from '@/lib/utils';
-import { api } from '@/lib/api';
+import { api, API_BASE_URL } from '@/lib/api';
 
 // ─── PDF Viewer ───────────────────────────────────────────────────────────────
 
@@ -66,7 +66,7 @@ function PdfViewer({ filePath }: { filePath: string }) {
         </svg>
         <p className="text-sm">Could not load answer sheet</p>
         <a
-          href={`${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api/v1'}/submissions/file?path=${encodeURIComponent(filePath)}`}
+          href={`${API_BASE_URL}/submissions/file?path=${encodeURIComponent(filePath)}`}
           target="_blank"
           rel="noreferrer"
           className="text-xs text-blue-600 hover:underline"

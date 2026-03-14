@@ -4,10 +4,9 @@ import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  const isProduction = process.env.APP_ENV === 'production';
   const allowedOrigins = [
     process.env.FRONTEND_URL,
-    !isProduction ? 'http://localhost:3000' : null,
+    'http://localhost:3000',
   ].filter((origin): origin is string => Boolean(origin));
 
   // Global validation pipe
@@ -20,10 +19,11 @@ async function bootstrap() {
   );
 
   // CORS — frontend domain only
-  // Temporary debugging fix: allow all origins to verify whether CORS is causing login failures.
   app.enableCors({
-    origin: true,
+    origin: [...allowedOrigins, /\.vercel\.app$/],
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
   });
 
   // Global prefix
