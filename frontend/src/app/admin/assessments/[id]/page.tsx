@@ -279,7 +279,7 @@ export default function AssessmentDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="p-6 max-w-4xl mx-auto">
+      <div className="mx-auto max-w-4xl p-4 sm:p-6">
         <div className="animate-pulse h-8 w-48 bg-slate-200 rounded mb-6" />
         <div className="animate-pulse h-64 bg-slate-100 rounded-xl" />
       </div>
@@ -288,7 +288,7 @@ export default function AssessmentDetailPage() {
 
   if (!assessment) {
     return (
-      <div className="p-6 text-slate-500">
+      <div className="p-4 text-slate-500 sm:p-6">
         Assessment not found.{' '}
         <Link href="/admin/assessments" className="text-blue-600 hover:underline">
           Back
@@ -439,9 +439,9 @@ export default function AssessmentDetailPage() {
   };
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div className="mx-auto max-w-4xl p-4 sm:p-6">
       {/* Header */}
-      <div className="flex items-start gap-3 mb-6">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start">
         <Link
           href="/admin/assessments"
           className="text-slate-400 hover:text-slate-600 text-sm mt-1"
@@ -476,7 +476,7 @@ export default function AssessmentDetailPage() {
           </div>
         </div>
 
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setShowSettings(true)}
             className="text-sm px-3 py-1.5 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50"
@@ -512,10 +512,10 @@ export default function AssessmentDetailPage() {
 
       {/* Questions */}
       <div className="bg-white rounded-xl border border-slate-200 p-5">
-        <div className="flex items-center justify-between mb-4">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="font-semibold text-slate-800">Questions</h2>
           {!showAddQ && (
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row">
               <button
                 onClick={() => setShowAiGenerate(true)}
                 className="text-sm px-3 py-1.5 border border-purple-300 text-purple-600 rounded-lg hover:bg-purple-50"
@@ -645,7 +645,7 @@ export default function AssessmentDetailPage() {
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
               />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">
                   Total Marks
@@ -679,7 +679,7 @@ export default function AssessmentDetailPage() {
                 </label>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">
                   Start (IST)
@@ -770,7 +770,7 @@ export default function AssessmentDetailPage() {
 
             {/* Dynamic count + marks fields */}
             {(aiForm.questionType === 'mcq' || aiForm.questionType === 'both') && (
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">MCQ Questions (1–20)</label>
                   <input
@@ -792,7 +792,7 @@ export default function AssessmentDetailPage() {
               </div>
             )}
             {(aiForm.questionType === 'descriptive' || aiForm.questionType === 'both') && (
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Descriptive Questions (1–20)</label>
                   <input
@@ -837,7 +837,7 @@ export default function AssessmentDetailPage() {
                     : aiForm.mcqCount + aiForm.descCount})
                 </span>
               </label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                 <div>
                   <label className="block text-xs text-green-700 font-medium mb-1">Easy</label>
                   <input

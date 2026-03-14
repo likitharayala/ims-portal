@@ -150,7 +150,7 @@ export default function StudentProfilePage() {
         {Array.from({ length: 3 }).map((_, i) => (
           <div key={i} className="bg-white rounded-xl border border-slate-200 p-6 animate-pulse">
             <div className="h-4 w-32 bg-slate-200 rounded mb-4" />
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               {Array.from({ length: 4 }).map((_, j) => (
                 <div key={j} className="h-10 bg-slate-100 rounded" />
               ))}

@@ -73,7 +73,7 @@ export default function SignupPage() {
 
   if (success) {
     return (
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 text-center">
+      <div className="bg-white rounded-2xl border border-slate-200 p-6 text-center shadow-sm sm:p-8">
         <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
           <svg className="w-8 h-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -92,7 +92,7 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
+    <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm sm:p-8">
       <h2 className="text-xl font-semibold text-slate-800 mb-6">Create your institute</h2>
 
       {error && (
@@ -102,7 +102,7 @@ export default function SignupPage() {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Your Name</label>
             <input
@@ -147,7 +147,7 @@ export default function SignupPage() {
           {fieldErrors.instituteName && <p className="text-xs text-red-500 mt-1">{fieldErrors.instituteName}</p>}
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
             <input
@@ -174,7 +174,7 @@ export default function SignupPage() {
           <label className="block text-sm font-medium text-slate-700 mb-2">
             Features <span className="text-red-500">*</span>
           </label>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {FEATURES.map((f) => (
               <label
                 key={f.value}

@@ -58,7 +58,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
+    <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm sm:p-8">
       <h2 className="text-xl font-semibold text-slate-800 mb-6">Sign in to your account</h2>
 
       {error && (

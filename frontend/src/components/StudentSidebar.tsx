@@ -13,6 +13,7 @@ const NAV_LINKS = [
   { href: '/student/assessments', label: 'Assessments', icon: '📝', feature: 'assessments' },
   { href: '/student/materials', label: 'Materials', icon: '📄', feature: 'materials' },
   { href: '/student/results', label: 'My Results', icon: '🏆', feature: 'assessments' },
+  { href: '/student/progress', label: 'Learning Progress', icon: '📊', feature: 'assessments' },
   { href: '/student/attendance', label: 'Attendance', icon: '✓', feature: undefined },
   { href: '/student/notifications', label: 'Notifications', icon: '🔔', feature: undefined },
   { href: '/student/profile', label: 'My Profile', icon: '👤', feature: undefined },

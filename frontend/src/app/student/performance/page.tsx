@@ -32,8 +32,8 @@ export default function StudentPerformancePage() {
       : null;
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <div className="flex items-center gap-3 mb-6">
+    <div className="mx-auto max-w-4xl p-4 sm:p-6">
+      <div className="mb-6 flex flex-wrap items-center gap-3">
         <Link href="/student/profile" className="text-slate-400 hover:text-slate-600 text-sm">
           ← Profile
         </Link>
@@ -42,7 +42,7 @@ export default function StudentPerformancePage() {
 
       {/* Summary cards */}
       {!isLoading && records.length > 0 && (
-        <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div className="bg-white rounded-xl border border-slate-200 p-4 text-center">
             <p className="text-2xl font-bold text-blue-700">{records.length}</p>
             <p className="text-xs text-slate-500 mt-1">Total Assessments</p>
@@ -72,7 +72,7 @@ export default function StudentPerformancePage() {
           <p className="text-sm text-slate-500 mt-1">Your results will appear here once you take assessments.</p>
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
