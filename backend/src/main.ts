@@ -1,13 +1,17 @@
-import { NestFactory, Reflector } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-  const allowedOrigins = [
-    process.env.FRONTEND_URL,
-    'http://localhost:3000',
-  ].filter((origin): origin is string => Boolean(origin));
+  const logger = new Logger('Bootstrap');
+  const app = await NestFactory.create(AppModule, {
+    logger:
+      process.env.APP_ENV === 'production'
+        ? ['error', 'warn', 'log']
+        : ['error', 'warn', 'log', 'debug', 'verbose'],
+  });
+  const frontendUrl = process.env.FRONTEND_URL?.replace(/\/$/, '');
+  const port = Number(process.env.PORT) || 8080;
 
   // Global validation pipe
   app.useGlobalPipes(
@@ -20,7 +24,32 @@ async function bootstrap() {
 
   // CORS — frontend domain only
   app.enableCors({
-    origin: [...allowedOrigins, /\.vercel\.app$/],
+    origin: (origin, callback) => {
+      if (!origin) {
+        callback(null, true);
+        return;
+      }
+
+      const normalizedOrigin = origin.replace(/\/$/, '');
+      const isConfiguredFrontend = normalizedOrigin === frontendUrl;
+      const isLocalDevelopment = normalizedOrigin === 'http://localhost:3000';
+
+      let isVercelDeployment = false;
+      try {
+        const { hostname } = new URL(normalizedOrigin);
+        isVercelDeployment =
+          hostname === 'vercel.app' || hostname.endsWith('.vercel.app');
+      } catch {
+        isVercelDeployment = false;
+      }
+
+      if (isConfiguredFrontend || isLocalDevelopment || isVercelDeployment) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error('Not allowed by CORS'), false);
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
@@ -28,10 +57,17 @@ async function bootstrap() {
 
   // Global prefix
   app.setGlobalPrefix('api/v1');
+  app.enableShutdownHooks();
 
-  const port = process.env.PORT || 8080;
   await app.listen(port, '0.0.0.0');
-  console.log(`Teachly backend running on port ${port}/api/v1`);
+
+  logger.log(`Teachly backend listening on 0.0.0.0:${port}`);
+  logger.log(`API prefix: /api/v1`);
+  if (frontendUrl) {
+    logger.log(`Configured frontend origin: ${frontendUrl}`);
+  } else {
+    logger.warn('FRONTEND_URL is not set; only localhost and Vercel preview domains will be allowed by CORS.');
+  }
 }
 
 bootstrap();
