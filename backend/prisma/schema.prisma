@@ -91,6 +91,10 @@ model User {
   authMigratedAt              DateTime? @map("auth_migrated_at") @db.Timestamptz()
   supabaseAuthId              String?   @unique @map("supabase_auth_id") @db.Uuid
   authMigrationStatus         String?   @map("auth_migration_status") @db.VarChar(20)
+  pendingFeatureIds           Int[]     @default([]) @map("pending_feature_ids")
+  lastMigrationError          String?   @map("last_migration_error") @db.Text
+  migrationRetryCount         Int       @default(0) @map("migration_retry_count")
+  lastMigrationAttempt        DateTime? @map("last_migration_attempt") @db.Timestamptz()
   passwordHash                String    @map("password_hash") @db.VarChar(255)
   sessionId                   String?   @map("session_id") @db.Uuid
   refreshTokenHash            String?   @map("refresh_token_hash") @db.VarChar(255)

@@ -62,13 +62,7 @@ export class AuthService {
     const normalizedEmail = dto.email.trim().toLowerCase();
     const supabaseProvisioningEnabled = this.isSupabaseProvisioningEnabled();
 
-    // Check uniqueness
-    const existingUser = await this.prisma.user.findFirst({
-      where: { email: normalizedEmail, isDeleted: false },
-    });
-    if (existingUser) {
-      throw new ConflictException('An account with this email already exists');
-    }
+    await this.userProvisioning.validateAdminSignup(normalizedEmail);
 
     const existingInstitute = await this.prisma.institute.findFirst({
       where: { name: dto.instituteName },
@@ -92,137 +86,56 @@ export class AuthService {
       throw new InternalServerErrorException('Admin role not seeded');
     }
 
-    let instituteId: string;
-    let userId: string;
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    const result = await this.userProvisioning.createLocalAdminProvisioning({
+      instituteName: dto.instituteName,
+      normalizedEmail,
+      phone: dto.phone,
+      slug,
+      adminRoleId: adminRole.id,
+      adminName: dto.name,
+      passwordHash,
+      isEmailVerified: false,
+      authProvider: 'custom',
+      authMigratedAt: null,
+      authMigrationStatus: supabaseProvisioningEnabled ? 'pending' : null,
+      emailVerificationToken: tokenHash,
+      emailVerificationExpiresAt: expiresAt,
+      featureIds: featureRecords.map((f) => f.id),
+    });
+
+    const instituteId = result.instituteId;
+    const userId = result.userId;
+    const featureIds = featureRecords.map((f) => f.id);
 
     if (supabaseProvisioningEnabled) {
-      const provisioningResult = await this.userProvisioning.provisionInvitedUser<{
-        instituteId: string;
-        userId: string;
-      }>({
-        action: 'admin_signup',
-        email: normalizedEmail,
-        redirectTo: this.getSupabaseInviteRedirectUrl(),
-        metadata: {
-          instituteName: dto.instituteName,
-          role: 'admin',
-        },
-        writeLocal: async (tx, authUser, email) => {
-          const institute = await tx.institute.create({
-            data: { name: dto.instituteName, email, phone: dto.phone, slug },
-          });
-
-          const user = await tx.user.create({
-            data: {
-              id: authUser.id,
-              instituteId: institute.id,
-              roleId: adminRole.id,
-              name: dto.name,
-              email,
-              phone: dto.phone,
-              authProvider: 'supabase',
-              authMigratedAt: null,
-              passwordHash,
-              isEmailVerified: false,
-            } as any,
-          });
-
-          await tx.instituteFeature.createMany({
-            data: featureRecords.map((f) => ({
-              instituteId: institute.id,
-              featureId: f.id,
-              isEnabled: true,
-            })),
-          });
-
-          return {
-            appUser: user,
-            payload: {
-              instituteId: institute.id,
-              userId: user.id,
-            },
-          };
-        },
+      void this.triggerAdminSupabaseProvisioning({
+        userId: result.user.id,
+        instituteId: result.user.instituteId,
+        email: result.user.email,
+        plaintextPassword: dto.password,
       });
-
-      if (provisioningResult.status !== 'created' || !provisioningResult.payload) {
-        throw new ConflictException('An account with this email already exists');
-      }
-
-      instituteId = provisioningResult.payload.instituteId;
-      userId = provisioningResult.payload.userId;
-    } else {
-      const rawToken = crypto.randomBytes(32).toString('hex');
-      const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
-      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-
-      const result = await this.prisma.$transaction(async (tx) => {
-        const institute = await tx.institute.create({
-          data: {
-            name: dto.instituteName,
-            email: normalizedEmail,
-            phone: dto.phone,
-            slug,
-          },
-        });
-
-        const user = await tx.user.create({
-          data: {
-            instituteId: institute.id,
-            roleId: adminRole.id,
-            name: dto.name,
-            email: normalizedEmail,
-            phone: dto.phone,
-            authProvider: 'custom',
-            authMigratedAt: null,
-            passwordHash,
-            emailVerificationToken: tokenHash,
-            emailVerificationExpiresAt: expiresAt,
-            isEmailVerified: false,
-          } as any,
-        });
-
-        await tx.instituteFeature.createMany({
-          data: featureRecords.map((f) => ({
-            instituteId: institute.id,
-            featureId: f.id,
-            isEnabled: true,
-          })),
-        });
-
-        return {
-          instituteId: institute.id,
-          userId: user.id,
-          email: user.email,
-          name: user.name,
-          rawToken,
-        };
-      });
-
-      instituteId = result.instituteId;
-      userId = result.userId;
-
-      try {
-        await this.email.sendVerificationEmail(result.email, result.name, result.rawToken);
-      } catch (err) {
-        this.logger.error('Failed to send verification email', (err as Error).message);
-      }
     }
 
-    try {
-      await this.auditLog.record({
-        instituteId,
-        userId,
-        action: 'SIGNUP',
-        targetId: userId,
-        targetType: 'user',
-      });
-    } catch {}
+    void this.triggerAdminFeatureProvisioning({
+      userId,
+      instituteId,
+      featureIds,
+    });
+    void this.triggerAdminVerificationEmail({
+      email: result.user.email,
+      name: result.user.name,
+      token: rawToken,
+      instituteId,
+      userId,
+    });
+    void this.triggerSignupAuditLog(instituteId, userId);
 
     return {
-      message: supabaseProvisioningEnabled
-        ? 'Account created. Check your email to complete your invite.'
-        : 'Account created. Please verify your email to continue.',
+      message: 'Account created. Please verify your email to continue.',
     };
   }
 
@@ -671,11 +584,6 @@ export class AuthService {
     return `${base64}${padding}`;
   }
 
-  private getSupabaseInviteRedirectUrl(): string {
-    const frontendUrl = (this.config.get<string>('FRONTEND_URL') ?? '').replace(/\/+$/, '');
-    return `${frontendUrl}/auth/complete-invite`;
-  }
-
   private async triggerLegacyUserMigration(
     user: {
       id: string;
@@ -713,6 +621,81 @@ export class AuthService {
     } catch (error) {
       this.logger.warn(
         `Login-triggered auth migration failed for user ${user.id}: ${
+          error instanceof Error ? error.message : 'unknown_error'
+        }`,
+      );
+    }
+  }
+
+  private async triggerAdminSupabaseProvisioning(input: {
+    userId: string;
+    instituteId: string;
+    email: string;
+    plaintextPassword: string;
+  }): Promise<void> {
+    try {
+      await this.userProvisioning.provisionAdminSupabaseUser(input);
+    } catch (error) {
+      this.logger.warn(
+        `Background Supabase provisioning failed for admin ${input.userId}: ${
+          error instanceof Error ? error.message : 'unknown_error'
+        }`,
+      );
+    }
+  }
+
+  private async triggerAdminFeatureProvisioning(input: {
+    userId: string;
+    instituteId: string;
+    featureIds: number[];
+  }): Promise<void> {
+    try {
+      await this.userProvisioning.provisionAdminInstituteFeatures(input);
+    } catch (error) {
+      this.logger.warn(
+        `Background feature provisioning failed for institute ${input.instituteId}: ${
+          error instanceof Error ? error.message : 'unknown_error'
+        }`,
+      );
+    }
+  }
+
+  private async triggerAdminVerificationEmail(input: {
+    email: string;
+    name: string;
+    token: string;
+    instituteId: string;
+    userId: string;
+  }): Promise<void> {
+    try {
+      await this.userProvisioning.sendAdminVerificationEmail({
+        userId: input.userId,
+        instituteId: input.instituteId,
+        email: input.email,
+        name: input.name,
+        rawToken: input.token,
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Background verification email failed for user ${input.userId}: ${
+          error instanceof Error ? error.message : 'unknown_error'
+        }`,
+      );
+    }
+  }
+
+  private async triggerSignupAuditLog(instituteId: string, userId: string): Promise<void> {
+    try {
+      await this.auditLog.record({
+        instituteId,
+        userId,
+        action: 'SIGNUP',
+        targetId: userId,
+        targetType: 'user',
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Background signup audit log failed for user ${userId}: ${
           error instanceof Error ? error.message : 'unknown_error'
         }`,
       );

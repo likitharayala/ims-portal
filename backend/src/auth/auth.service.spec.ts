@@ -6,6 +6,15 @@ describe('AuthService', () => {
   let service: AuthService;
 
   const prisma = {
+    institute: {
+      findFirst: jest.fn(),
+    },
+    feature: {
+      findMany: jest.fn(),
+    },
+    role: {
+      findFirst: jest.fn(),
+    },
     user: {
       findFirst: jest.fn(),
       findUnique: jest.fn(),
@@ -33,6 +42,11 @@ describe('AuthService', () => {
   };
 
   const userProvisioningService = {
+    validateAdminSignup: jest.fn(),
+    createLocalAdminProvisioning: jest.fn(),
+    provisionAdminSupabaseUser: jest.fn(),
+    provisionAdminInstituteFeatures: jest.fn(),
+    sendAdminVerificationEmail: jest.fn(),
     provisionInvitedUser: jest.fn(),
   };
 
@@ -456,6 +470,244 @@ describe('AuthService', () => {
       ).rejects.toBeInstanceOf(UnauthorizedException);
 
       expect(supabaseAuthService.signIn).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('signup', () => {
+    it('runs fast admin signup validation before local provisioning begins', async () => {
+      configService.get.mockImplementation((key: string) => {
+        if (key === 'SUPABASE_PROVISIONING_ENABLED') return 'true';
+        return undefined;
+      });
+      userProvisioningService.validateAdminSignup.mockResolvedValue(undefined);
+      prisma.institute.findFirst.mockResolvedValue(null);
+      prisma.feature.findMany.mockResolvedValue([{ id: 1, name: 'students' }]);
+      prisma.role.findFirst.mockResolvedValue({ id: 1, name: 'admin' });
+      userProvisioningService.createLocalAdminProvisioning.mockResolvedValue({
+        instituteId: 'institute-1',
+        userId: 'user-1',
+        user: {
+          id: 'user-1',
+          instituteId: 'institute-1',
+          email: 'admin@example.com',
+          name: 'Admin',
+        },
+      });
+      userProvisioningService.sendAdminVerificationEmail.mockResolvedValue(true);
+      userProvisioningService.provisionAdminInstituteFeatures.mockResolvedValue(undefined);
+      userProvisioningService.provisionAdminSupabaseUser.mockResolvedValue(undefined);
+
+      await service.signup({
+        name: 'Admin',
+        instituteName: 'Teachly',
+        email: 'Admin@Example.com',
+        phone: '1234567890',
+        password: 'Password123',
+        features: ['students'],
+      });
+
+      expect(userProvisioningService.validateAdminSignup).toHaveBeenCalledWith('admin@example.com');
+      expect(userProvisioningService.validateAdminSignup.mock.invocationCallOrder[0]).toBeLessThan(
+        userProvisioningService.createLocalAdminProvisioning.mock.invocationCallOrder[0],
+      );
+    });
+
+    it('triggers background Supabase provisioning after successful local provisioning', async () => {
+      configService.get.mockImplementation((key: string) => {
+        if (key === 'SUPABASE_PROVISIONING_ENABLED') return 'true';
+        return undefined;
+      });
+      userProvisioningService.validateAdminSignup.mockResolvedValue(undefined);
+      prisma.institute.findFirst.mockResolvedValue(null);
+      prisma.feature.findMany.mockResolvedValue([{ id: 1, name: 'students' }]);
+      prisma.role.findFirst.mockResolvedValue({ id: 1, name: 'admin' });
+      userProvisioningService.createLocalAdminProvisioning.mockResolvedValue({
+        instituteId: 'institute-1',
+        userId: 'user-1',
+        user: {
+          id: 'user-1',
+          instituteId: 'institute-1',
+          email: 'admin@example.com',
+          name: 'Admin',
+        },
+      });
+      userProvisioningService.sendAdminVerificationEmail.mockResolvedValue(true);
+      userProvisioningService.provisionAdminInstituteFeatures.mockResolvedValue(undefined);
+      userProvisioningService.provisionAdminSupabaseUser.mockResolvedValue(undefined);
+
+      const result = await service.signup({
+        name: 'Admin',
+        instituteName: 'Teachly',
+        email: 'admin@example.com',
+        phone: '1234567890',
+        password: 'Password123',
+        features: ['students'],
+      });
+
+      expect(userProvisioningService.createLocalAdminProvisioning).toHaveBeenCalledWith(
+        expect.objectContaining({
+          normalizedEmail: 'admin@example.com',
+          authProvider: 'custom',
+          authMigrationStatus: 'pending',
+        }),
+      );
+      expect(userProvisioningService.provisionAdminSupabaseUser).toHaveBeenCalledWith({
+        userId: 'user-1',
+        instituteId: 'institute-1',
+        email: 'admin@example.com',
+        plaintextPassword: 'Password123',
+      });
+      expect(userProvisioningService.provisionAdminInstituteFeatures).toHaveBeenCalledWith({
+        userId: 'user-1',
+        instituteId: 'institute-1',
+        featureIds: [1],
+      });
+      expect(userProvisioningService.sendAdminVerificationEmail).toHaveBeenCalledWith({
+        userId: 'user-1',
+        instituteId: 'institute-1',
+        email: 'admin@example.com',
+        name: 'Admin',
+        rawToken: expect.any(String),
+      });
+      expect(result).toEqual({
+        message: 'Account created. Please verify your email to continue.',
+      });
+    });
+
+    it('does not wait for background email sending', async () => {
+      configService.get.mockImplementation((key: string) => {
+        if (key === 'SUPABASE_PROVISIONING_ENABLED') return 'true';
+        return undefined;
+      });
+      userProvisioningService.validateAdminSignup.mockResolvedValue(undefined);
+      prisma.institute.findFirst.mockResolvedValue(null);
+      prisma.feature.findMany.mockResolvedValue([{ id: 1, name: 'students' }]);
+      prisma.role.findFirst.mockResolvedValue({ id: 1, name: 'admin' });
+      userProvisioningService.createLocalAdminProvisioning.mockResolvedValue({
+        instituteId: 'institute-1',
+        userId: 'user-1',
+        user: {
+          id: 'user-1',
+          instituteId: 'institute-1',
+          email: 'admin@example.com',
+          name: 'Admin',
+        },
+      });
+      userProvisioningService.sendAdminVerificationEmail.mockImplementation(
+        () => new Promise(() => undefined),
+      );
+      userProvisioningService.provisionAdminInstituteFeatures.mockResolvedValue(undefined);
+      userProvisioningService.provisionAdminSupabaseUser.mockResolvedValue(undefined);
+
+      const result = await service.signup({
+        name: 'Admin',
+        instituteName: 'Teachly',
+        email: 'admin@example.com',
+        phone: '1234567890',
+        password: 'Password123',
+        features: ['students'],
+      });
+
+      expect(result).toEqual({
+        message: 'Account created. Please verify your email to continue.',
+      });
+      expect(userProvisioningService.sendAdminVerificationEmail).toHaveBeenCalled();
+    });
+
+    it('does not wait for background feature provisioning', async () => {
+      configService.get.mockImplementation((key: string) => {
+        if (key === 'SUPABASE_PROVISIONING_ENABLED') return 'true';
+        return undefined;
+      });
+      userProvisioningService.validateAdminSignup.mockResolvedValue(undefined);
+      prisma.institute.findFirst.mockResolvedValue(null);
+      prisma.feature.findMany.mockResolvedValue([{ id: 1, name: 'students' }]);
+      prisma.role.findFirst.mockResolvedValue({ id: 1, name: 'admin' });
+      userProvisioningService.createLocalAdminProvisioning.mockResolvedValue({
+        instituteId: 'institute-1',
+        userId: 'user-1',
+        user: {
+          id: 'user-1',
+          instituteId: 'institute-1',
+          email: 'admin@example.com',
+          name: 'Admin',
+        },
+      });
+      userProvisioningService.sendAdminVerificationEmail.mockResolvedValue(true);
+      userProvisioningService.provisionAdminInstituteFeatures.mockImplementation(
+        () => new Promise(() => undefined),
+      );
+      userProvisioningService.provisionAdminSupabaseUser.mockResolvedValue(undefined);
+
+      const result = await service.signup({
+        name: 'Admin',
+        instituteName: 'Teachly',
+        email: 'admin@example.com',
+        phone: '1234567890',
+        password: 'Password123',
+        features: ['students'],
+      });
+
+      expect(result).toEqual({
+        message: 'Account created. Please verify your email to continue.',
+      });
+      expect(userProvisioningService.provisionAdminInstituteFeatures).toHaveBeenCalledWith({
+        userId: 'user-1',
+        instituteId: 'institute-1',
+        featureIds: [1],
+      });
+    });
+
+    it('does not block signup when background tasks fail', async () => {
+      configService.get.mockImplementation((key: string) => {
+        if (key === 'SUPABASE_PROVISIONING_ENABLED') return 'true';
+        return undefined;
+      });
+      userProvisioningService.validateAdminSignup.mockResolvedValue(undefined);
+      prisma.institute.findFirst.mockResolvedValue(null);
+      prisma.feature.findMany.mockResolvedValue([{ id: 1, name: 'students' }]);
+      prisma.role.findFirst.mockResolvedValue({ id: 1, name: 'admin' });
+      userProvisioningService.createLocalAdminProvisioning.mockResolvedValue({
+        instituteId: 'institute-1',
+        userId: 'user-1',
+        user: {
+          id: 'user-1',
+          instituteId: 'institute-1',
+          email: 'admin@example.com',
+          name: 'Admin',
+        },
+      });
+      userProvisioningService.sendAdminVerificationEmail.mockRejectedValue(new Error('smtp failed'));
+      userProvisioningService.provisionAdminInstituteFeatures.mockRejectedValue(
+        new Error('feature failed'),
+      );
+      userProvisioningService.provisionAdminSupabaseUser.mockRejectedValue(
+        new Error('supabase create failed'),
+      );
+      auditLog.record.mockRejectedValue(new Error('audit failed'));
+
+      const result = await service.signup({
+        name: 'Admin',
+        instituteName: 'Teachly',
+        email: 'admin@example.com',
+        phone: '1234567890',
+        password: 'Password123',
+        features: ['students'],
+      });
+
+      expect(result).toEqual({
+        message: 'Account created. Please verify your email to continue.',
+      });
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(userProvisioningService.sendAdminVerificationEmail).toHaveBeenCalled();
+      expect(userProvisioningService.provisionAdminInstituteFeatures).toHaveBeenCalled();
+      expect(auditLog.record).toHaveBeenCalledWith({
+        instituteId: 'institute-1',
+        userId: 'user-1',
+        action: 'SIGNUP',
+        targetId: 'user-1',
+        targetType: 'user',
+      });
     });
   });
 
