@@ -4,15 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useCreateStudent } from '@/hooks/use-students';
-import { CredentialModal } from '../CredentialModal';
 import { Toast, useToast } from '@/components/ui/Toast';
 import { getApiError } from '@/lib/utils';
-
-interface Credential {
-  email: string;
-  tempPassword: string;
-  name: string;
-}
 
 const INITIAL_FORM = {
   name: '',
@@ -33,7 +26,6 @@ export default function NewStudentPage() {
   const router = useRouter();
   const [form, setForm] = useState(INITIAL_FORM);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [credential, setCredential] = useState<Credential | null>(null);
   const { toast, show: showToast, hide: hideToast } = useToast();
 
   const createMutation = useCreateStudent();
@@ -77,19 +69,16 @@ export default function NewStudentPage() {
       if (form.joinedDate) payload.joinedDate = form.joinedDate;
 
       const result = await createMutation.mutateAsync(payload);
-      setCredential({
-        email: form.email,
-        tempPassword: result.tempPassword,
-        name: form.name,
-      });
+      showToast(
+        result.message,
+        result.emailStatus === 'FAILED' ? 'warning' : 'success',
+      );
+      window.setTimeout(() => {
+        router.push('/admin/students');
+      }, result.emailStatus === 'FAILED' ? 2200 : 1400);
     } catch (err) {
       showToast(getApiError(err), 'error');
     }
-  };
-
-  const handleCredentialClose = () => {
-    setCredential(null);
-    router.push('/admin/students');
   };
 
   return (
@@ -268,7 +257,7 @@ export default function NewStudentPage() {
         </div>
 
         <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700">
-          A temporary password will be generated automatically. You will see it once after saving.
+          Credentials will be emailed to the student automatically after the account is created.
         </div>
 
         <div className="flex gap-3 justify-end">
@@ -287,15 +276,6 @@ export default function NewStudentPage() {
           </button>
         </div>
       </form>
-
-      {credential && (
-        <CredentialModal
-          email={credential.email}
-          tempPassword={credential.tempPassword}
-          studentName={credential.name}
-          onClose={handleCredentialClose}
-        />
-      )}
 
       {toast && <Toast message={toast.message} type={toast.type} onClose={hideToast} />}
     </div>

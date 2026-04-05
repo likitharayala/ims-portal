@@ -112,6 +112,17 @@ export class StudentsController {
     return this.studentsService.bulkUpload(user.institute_id, user.sub, file);
   }
 
+  @Post('admin/students/:id/resend-credentials')
+  @Roles(Role.Admin)
+  @RequiresFeature(Feature.Students)
+  @HttpCode(HttpStatus.OK)
+  async resendCredentials(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+  ) {
+    return this.studentsService.resendCredentials(user.institute_id, user.sub, id);
+  }
+
   // ─── Admin: profile photo ─────────────────────────────────────────────
   @Post('admin/students/:id/profile-photo')
   @Roles(Role.Admin)

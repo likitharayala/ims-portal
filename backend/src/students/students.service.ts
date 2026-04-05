@@ -1,40 +1,33 @@
 import {
   Injectable,
-  ConflictException,
+  InternalServerErrorException,
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
 import { FileUploadService } from '../file-upload/file-upload.service';
-import * as bcrypt from 'bcrypt';
 import * as ExcelJS from 'exceljs';
-import { v4 as uuidv4 } from 'uuid';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../audit-log/audit-log.service';
-import { PaymentsService } from '../payments/payments.service';
+import { DomainEventsService } from '../common/events/domain-events.service';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
 import { ListStudentsQueryDto } from './dto/list-students-query.dto';
+import { StudentOnboardingAuditService } from './student-onboarding-audit.service';
+import { StudentOnboardingService } from './student-onboarding.service';
+import { StudentBulkCreatedEvent } from './events/student-bulk-created.event';
+import { STUDENT_EMAIL_STATUS, STUDENT_EVENTS } from './students.constants';
 
 export interface BulkUploadResult {
   created: number;
+  queuedForEmail: number;
+  emailQueueFailures: number;
   skipped: number;
   errors: Array<{ row: number; email: string; reason: string }>;
-  credentials: Array<{ name: string; email: string; tempPassword: string }>;
 }
 
 const REQUIRED_COLUMNS = ['Name', 'Email', 'Phone', 'Class', 'School', 'Fee Amount'];
 
-const BCRYPT_ROUNDS = 12;
 const PAGE_SIZE = 20;
-
-function generateTempPassword(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
-  let pwd = '';
-  for (let i = 0; i < 8; i++) {
-    pwd += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return pwd;
-}
 
 const studentSelect = {
   id: true,
@@ -47,6 +40,10 @@ const studentSelect = {
   parentPhone: true,
   feeAmount: true,
   joinedDate: true,
+  emailSent: true,
+  emailSentAt: true,
+  emailStatus: true,
+  emailRetryCount: true,
   createdAt: true,
   user: {
     select: {
@@ -67,81 +64,21 @@ export class StudentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditLog: AuditLogService,
-    private readonly paymentsService: PaymentsService,
+    private readonly domainEvents: DomainEventsService,
     private readonly fileUpload: FileUploadService,
+    private readonly onboardingAudit: StudentOnboardingAuditService,
+    private readonly studentOnboarding: StudentOnboardingService,
   ) {}
 
   // ─────────────────────────────────────────────────────────────────────
   // Create
   // ─────────────────────────────────────────────────────────────────────
   async createStudent(instituteId: string, userId: string, dto: CreateStudentDto) {
-    // Check email uniqueness
-    const existing = await this.prisma.user.findFirst({
-      where: { email: dto.email, isDeleted: false },
-    });
-    if (existing) throw new ConflictException('A user with this email already exists');
+    return this.studentOnboarding.createStudentAndQueueCredentials(instituteId, userId, dto);
+  }
 
-    const studentRole = await this.prisma.role.findFirst({ where: { name: 'student' } });
-    if (!studentRole) throw new Error('Student role not seeded');
-
-    const tempPassword = generateTempPassword();
-    const passwordHash = await bcrypt.hash(tempPassword, BCRYPT_ROUNDS);
-    const sessionId = uuidv4();
-
-    const student = await this.prisma.$transaction(async (tx) => {
-      const user = await tx.user.create({
-        data: {
-          instituteId,
-          roleId: studentRole.id,
-          name: dto.name,
-          email: dto.email,
-          phone: dto.phone,
-          passwordHash,
-          sessionId,
-          mustChangePassword: true,
-          isEmailVerified: true, // students don't verify email themselves
-        },
-      });
-
-      return tx.student.create({
-        data: {
-          instituteId,
-          userId: user.id,
-          rollNumber: dto.rollNumber,
-          class: dto.class,
-          school: dto.school,
-          feeAmount: dto.feeAmount,
-          dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : null,
-          address: dto.address,
-          parentName: dto.parentName,
-          parentPhone: dto.parentPhone,
-          joinedDate: dto.joinedDate ? new Date(dto.joinedDate) : new Date(),
-        },
-        select: studentSelect,
-      });
-    });
-
-    // Generate current-month payment record immediately
-    try {
-      await this.paymentsService.createPaymentForStudent(
-        instituteId,
-        student.id,
-        student.feeAmount as any,
-      );
-    } catch {}
-
-    try {
-      await this.auditLog.record({
-        instituteId,
-        userId,
-        action: 'CREATE_STUDENT',
-        targetId: student.id,
-        targetType: 'student',
-        newValues: { email: dto.email, class: dto.class, school: dto.school },
-      });
-    } catch {}
-
-    return { student, tempPassword };
+  async resendCredentials(instituteId: string, userId: string, studentId: string) {
+    return this.studentOnboarding.resendCredentials(instituteId, userId, studentId);
   }
 
   // ─────────────────────────────────────────────────────────────────────
@@ -284,7 +221,7 @@ export class StudentsService {
   }
 
   // ─────────────────────────────────────────────────────────────────────
-  // Bulk upload (synchronous — no Redis/queue required)
+  // Bulk upload
   // ─────────────────────────────────────────────────────────────────────
   async bulkUpload(
     instituteId: string,
@@ -300,7 +237,13 @@ export class StudentsService {
       throw new BadRequestException('Only .xlsx files are allowed');
     }
 
-    const result: BulkUploadResult = { created: 0, skipped: 0, errors: [], credentials: [] };
+    const result: BulkUploadResult = {
+      created: 0,
+      queuedForEmail: 0,
+      emailQueueFailures: 0,
+      skipped: 0,
+      errors: [],
+    };
 
     // Load workbook
     const workbook = new ExcelJS.Workbook();
@@ -330,7 +273,7 @@ export class StudentsService {
     const colIndex = (name: string) => headers.indexOf(name);
 
     const studentRole = await this.prisma.role.findFirst({ where: { name: 'student' } });
-    if (!studentRole) throw new Error('Student role not seeded');
+    if (!studentRole) throw new InternalServerErrorException('Student role not seeded');
 
     const rowCount = worksheet.rowCount;
 
@@ -398,73 +341,61 @@ export class StudentsService {
         continue;
       }
 
-      // Optional fields
-      const rollNumber = getCellValue('Roll Number') || undefined;
-      const dobStr = getCellValue('Date of Birth');
-      const address = getCellValue('Address') || undefined;
-      const parentName = getCellValue('Parent Name') || undefined;
-      const parentPhone = getCellValue('Parent Phone') || undefined;
-      const joinedDateStr = getCellValue('Joined Date');
-      const dateOfBirth = dobStr ? new Date(dobStr) : undefined;
-      const joinedDate = joinedDateStr ? new Date(joinedDateStr) : new Date();
+      const payload: CreateStudentDto = {
+        name,
+        email,
+        phone,
+        class: studentClass,
+        school,
+        feeAmount,
+        ...(getCellValue('Roll Number') && { rollNumber: getCellValue('Roll Number') }),
+        ...(getCellValue('Date of Birth') && { dateOfBirth: getCellValue('Date of Birth') }),
+        ...(getCellValue('Address') && { address: getCellValue('Address') }),
+        ...(getCellValue('Parent Name') && { parentName: getCellValue('Parent Name') }),
+        ...(getCellValue('Parent Phone') && { parentPhone: getCellValue('Parent Phone') }),
+        ...(getCellValue('Joined Date') && { joinedDate: getCellValue('Joined Date') }),
+      };
 
       try {
-        const tempPassword = generateTempPassword();
-        const passwordHash = await bcrypt.hash(tempPassword, BCRYPT_ROUNDS);
-        const sessionId = uuidv4();
-
-        const student = await this.prisma.$transaction(async (tx) => {
-          const user = await tx.user.create({
-            data: {
-              instituteId,
-              roleId: studentRole.id,
-              name,
-              email,
-              phone,
-              passwordHash,
-              sessionId,
-              mustChangePassword: true,
-              isEmailVerified: true,
-            },
-          });
-          return tx.student.create({
-            data: {
-              instituteId,
-              userId: user.id,
-              rollNumber,
-              class: studentClass,
-              school,
-              feeAmount,
-              dateOfBirth: dateOfBirth ?? null,
-              address,
-              parentName,
-              parentPhone,
-              joinedDate,
-            },
-          });
-        });
-
-        // Create current-month payment record
-        try {
-          await this.paymentsService.createPaymentForStudent(instituteId, student.id, feeAmount as any);
-        } catch {}
-
+        const queueResult = await this.studentOnboarding.createStudentFromBulkUpload(
+          instituteId,
+          userId,
+          payload,
+          {
+            studentRoleId: studentRole.id,
+            skipExistingEmailCheck: true,
+          },
+        );
         result.created++;
-        result.credentials.push({ name, email, tempPassword });
-
-        try {
-          await this.auditLog.record({
-            instituteId,
-            userId,
-            action: 'BULK_CREATE_STUDENT',
-            newValues: { name, email, class: studentClass, school },
-          });
-        } catch {}
-      } catch (err) {
+        if (queueResult.emailStatus === STUDENT_EMAIL_STATUS.FAILED) {
+          result.emailQueueFailures++;
+        } else {
+          result.queuedForEmail++;
+        }
+      } catch {
         result.errors.push({ row: rowNum, email, reason: 'Failed to create student record' });
         result.skipped++;
       }
     }
+
+    await this.onboardingAudit.logBulkCreated(instituteId, userId, {
+      created: result.created,
+      skipped: result.skipped,
+      queuedForEmail: result.queuedForEmail,
+      emailQueueFailures: result.emailQueueFailures,
+    });
+
+    this.domainEvents.emit(
+      STUDENT_EVENTS.BULK_CREATED,
+      new StudentBulkCreatedEvent(
+        instituteId,
+        userId,
+        result.created,
+        result.skipped,
+        result.queuedForEmail,
+        result.emailQueueFailures,
+      ),
+    );
 
     return result;
   }

@@ -13,6 +13,10 @@ export interface Student {
   profilePhotoPath: string | null;
   feeAmount: string;
   joinedDate: string;
+  emailSent: boolean;
+  emailSentAt: string | null;
+  emailStatus: string;
+  emailRetryCount: number;
   createdAt: string;
   user: {
     id: string;
@@ -80,7 +84,7 @@ export function useCreateStudent() {
   return useMutation({
     mutationFn: async (payload: Record<string, unknown>) => {
       const { data } = await api.post('/admin/students', payload);
-      return data.data as { student: Student; tempPassword: string };
+      return data.data as { student: Student; message: string; emailStatus: string };
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['students'] });
@@ -116,6 +120,20 @@ export function useDeleteStudent() {
   });
 }
 
+export function useResendStudentCredentials() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { data } = await api.post(`/admin/students/${id}/resend-credentials`);
+      return data.data as { studentId: string; message: string; emailStatus: string };
+    },
+    onSuccess: (_data, id) => {
+      qc.invalidateQueries({ queryKey: ['students'] });
+      qc.invalidateQueries({ queryKey: ['student', id] });
+    },
+  });
+}
+
 export function useUploadStudentPhoto() {
   const qc = useQueryClient();
   return useMutation({
@@ -135,9 +153,10 @@ export function useUploadStudentPhoto() {
 
 export interface BulkUploadResult {
   created: number;
+  queuedForEmail: number;
+  emailQueueFailures: number;
   skipped: number;
   errors: Array<{ row: number; email: string; reason: string }>;
-  credentials: Array<{ name: string; email: string; tempPassword: string }>;
 }
 
 export function useBulkUpload() {

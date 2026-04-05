@@ -40,7 +40,11 @@ export function useCreateTeacher() {
     }) => {
       const res = await api.post<{
         success: true;
-        data: { teacher: Teacher; tempPassword: string };
+        data: {
+          teacher: Teacher;
+          tempPassword: string | null;
+          onboardingMethod: 'manual_temp_password' | 'supabase_invite';
+        };
       }>('/admin/teachers', data);
       return res.data.data;
     },

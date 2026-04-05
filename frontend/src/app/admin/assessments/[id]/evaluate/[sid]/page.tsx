@@ -11,7 +11,48 @@ import {
 import type { AssessmentQuestion } from '@/hooks/use-assessments';
 import { Toast, useToast } from '@/components/ui/Toast';
 import { getApiError } from '@/lib/utils';
-import { api, API_BASE_URL } from '@/lib/api';
+import { api } from '@/lib/api';
+
+type SubmissionAnswer = {
+  selectedOption?: string;
+  text?: string;
+};
+
+type SubmissionFeedback = {
+  marks?: number;
+  comment?: string;
+  flagged?: boolean;
+};
+
+type UploadedFile = {
+  filePath: string;
+};
+
+type EvaluationStudent = {
+  isDeleted?: boolean;
+  class?: string;
+  user?: {
+    name?: string;
+    email?: string;
+  };
+};
+
+type EvaluationAssessment = {
+  questions?: AssessmentQuestion[];
+  negativeMarking?: boolean;
+  negativeValue?: number;
+};
+
+type EvaluationSubmission = {
+  assessment?: EvaluationAssessment;
+  answers?: Record<string, SubmissionAnswer> | null;
+  feedback?: Record<string, SubmissionFeedback> | null;
+  uploadedFiles?: UploadedFile[] | Record<string, UploadedFile[]> | null;
+  student?: EvaluationStudent;
+  isFinalized: boolean;
+  resultReleased: boolean;
+  status: string;
+};
 
 // ─── PDF Viewer ───────────────────────────────────────────────────────────────
 
@@ -22,25 +63,36 @@ function PdfViewer({ filePath }: { filePath: string }) {
   const urlRef = useRef<string | null>(null);
 
   useEffect(() => {
-    setLoading(true);
-    setError(false);
-    setBlobUrl(null);
+    let cancelled = false;
 
     api
       .get(`/submissions/file?path=${encodeURIComponent(filePath)}`, {
         responseType: 'blob',
       })
       .then((res) => {
+        if (cancelled) {
+          return;
+        }
         // Force application/pdf so iframe renders inline
         const blob = new Blob([res.data], { type: 'application/pdf' });
         const url = URL.createObjectURL(blob);
         urlRef.current = url;
         setBlobUrl(url);
+        setError(false);
       })
-      .catch(() => setError(true))
-      .finally(() => setLoading(false));
+      .catch(() => {
+        if (!cancelled) {
+          setError(true);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      });
 
     return () => {
+      cancelled = true;
       if (urlRef.current) {
         URL.revokeObjectURL(urlRef.current);
         urlRef.current = null;
@@ -66,7 +118,7 @@ function PdfViewer({ filePath }: { filePath: string }) {
         </svg>
         <p className="text-sm">Could not load answer sheet</p>
         <a
-          href={`${API_BASE_URL}/submissions/file?path=${encodeURIComponent(filePath)}`}
+          href={`/api/submissions/file?path=${encodeURIComponent(filePath)}`}
           target="_blank"
           rel="noreferrer"
           className="text-xs text-blue-600 hover:underline"
@@ -93,6 +145,7 @@ export default function EvaluateSubmissionPage() {
   const { toast, show: showToast, hide: hideToast } = useToast();
 
   const { data: submission, isLoading } = useSubmission(id, sid);
+  const evaluationSubmission = submission as EvaluationSubmission | undefined;
   const enterMarksMutation = useEnterMarks();
   const finalizeMutation = useFinalizeSubmission();
 
@@ -101,23 +154,23 @@ export default function EvaluateSubmissionPage() {
   >({});
 
   // ── Derived data ────────────────────────────────────────────────────────
-  const questions: AssessmentQuestion[] = submission?.assessment?.questions ?? [];
+  const questions: AssessmentQuestion[] = evaluationSubmission?.assessment?.questions ?? [];
   const answers = useMemo(
-    () => (submission?.answers as Record<string, any>) ?? {},
-    [submission?.answers],
+    () => evaluationSubmission?.answers ?? {},
+    [evaluationSubmission?.answers],
   );
   const existingFeedback = useMemo(
-    () => (submission?.feedback as Record<string, any>) ?? {},
-    [submission?.feedback],
+    () => evaluationSubmission?.feedback ?? {},
+    [evaluationSubmission?.feedback],
   );
 
-  const uploadedFiles: any[] = useMemo(() => {
-    const raw = submission?.uploadedFiles;
+  const uploadedFiles: UploadedFile[] = useMemo(() => {
+    const raw = evaluationSubmission?.uploadedFiles;
     if (!raw) return [];
     if (Array.isArray(raw)) return raw;
-    if (typeof raw === 'object') return Object.values(raw as Record<string, any[]>).flat();
+    if (typeof raw === 'object') return Object.values(raw).flat();
     return [];
-  }, [submission?.uploadedFiles]);
+  }, [evaluationSubmission?.uploadedFiles]);
 
   const isUploadSubmission = uploadedFiles.length > 0;
   const pdfFile = uploadedFiles[0] ?? null;
@@ -154,8 +207,8 @@ export default function EvaluateSubmissionPage() {
           if (ans.selectedOption === q.correctOption) {
             live += Number(q.marks);
           } else {
-            const neg = (submission?.assessment as any)?.negativeMarking
-              ? Number((submission?.assessment as any)?.negativeValue || 0)
+            const neg = evaluationSubmission?.assessment?.negativeMarking
+              ? Number(evaluationSubmission.assessment?.negativeValue || 0)
               : 0;
             live -= neg;
           }
@@ -227,7 +280,7 @@ export default function EvaluateSubmissionPage() {
     );
   }
 
-  if ((submission.student as any)?.isDeleted) {
+  if (evaluationSubmission?.student?.isDeleted) {
     return (
       <div className="p-6 text-slate-500">
         Submission not found.{' '}
@@ -556,7 +609,7 @@ export default function EvaluateSubmissionPage() {
         {isUploadSubmission && (
           <div className="flex-1 flex flex-col overflow-hidden bg-slate-100">
             {pdfFile ? (
-              <PdfViewer filePath={pdfFile.filePath} />
+              <PdfViewer key={pdfFile.filePath} filePath={pdfFile.filePath} />
             ) : (
               <div className="flex flex-col items-center justify-center h-full gap-3 text-slate-400">
                 <svg className="w-14 h-14 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -1,11 +1,13 @@
 import { Module, MiddlewareConsumer, NestModule, RequestMethod } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { BullModule } from '@nestjs/bull';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { JwtModule } from '@nestjs/jwt';
 import { APP_GUARD, APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 
 import { PrismaModule } from './prisma/prisma.module';
 import { AuditLogModule } from './audit-log/audit-log.module';
+import { DomainEventsModule } from './common/events/domain-events.module';
 import { EmailModule } from './email/email.module';
 import { AuthModule } from './auth/auth.module';
 import { StudentsModule } from './students/students.module';
@@ -45,8 +47,21 @@ import { ThrottlerGuard } from '@nestjs/throttler';
         secret: config.get<string>('JWT_SECRET'),
       }),
     }),
+    BullModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        redis: {
+          host: config.get<string>('REDIS_HOST') ?? '127.0.0.1',
+          port: parseInt(config.get<string>('REDIS_PORT') ?? '6379', 10),
+          lazyConnect: true,
+          connectTimeout: 5000,
+        },
+      }),
+    }),
     PrismaModule,
     AuditLogModule,
+    DomainEventsModule,
     EmailModule,
     AuthModule,
     StudentsModule,

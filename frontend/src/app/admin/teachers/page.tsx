@@ -22,7 +22,12 @@ function CreateTeacherModal({
   onError,
 }: {
   onClose: () => void;
-  onCreated: (name: string, email: string, tempPassword: string) => void;
+  onCreated: (result: {
+    name: string;
+    email: string;
+    tempPassword: string | null;
+    onboardingMethod: 'manual_temp_password' | 'supabase_invite';
+  }) => void;
   onError: (message: string) => void;
 }) {
   const [name, setName] = useState('');
@@ -44,7 +49,12 @@ function CreateTeacherModal({
         phone: phone || undefined,
         assignedClasses,
       });
-      onCreated(result.teacher.user.name, result.teacher.user.email, result.tempPassword);
+      onCreated({
+        name: result.teacher.user.name,
+        email: result.teacher.user.email,
+        tempPassword: result.tempPassword,
+        onboardingMethod: result.onboardingMethod,
+      });
       onClose();
     } catch (err) {
       onError(getApiError(err));
@@ -454,9 +464,21 @@ export default function TeachersPage() {
       {showCreate && (
         <CreateTeacherModal
           onClose={() => setShowCreate(false)}
-          onCreated={(name, email, tempPassword) => {
-            setCredential({ name, email, tempPassword });
-            showToast('Teacher added successfully');
+          onCreated={(result) => {
+            if (
+              result.onboardingMethod === 'manual_temp_password' &&
+              result.tempPassword
+            ) {
+              setCredential({
+                name: result.name,
+                email: result.email,
+                tempPassword: result.tempPassword,
+              });
+              showToast('Teacher added successfully');
+              return;
+            }
+
+            showToast(`Teacher added. Invite sent to ${result.email}`);
           }}
           onError={(message) => showToast(message, 'error')}
         />

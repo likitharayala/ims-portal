@@ -3,7 +3,13 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useStudent, useUpdateStudent, useDeleteStudent, useUploadStudentPhoto } from '@/hooks/use-students';
+import {
+  useStudent,
+  useUpdateStudent,
+  useDeleteStudent,
+  useUploadStudentPhoto,
+  useResendStudentCredentials,
+} from '@/hooks/use-students';
 import { useStudentPerformance } from '@/hooks/use-assessments';
 import type { PerformanceRecord } from '@/hooks/use-assessments';
 import { Modal } from '@/components/ui/Modal';
@@ -20,6 +26,7 @@ export default function StudentDetailPage() {
   const updateMutation = useUpdateStudent();
   const deleteMutation = useDeleteStudent();
   const photoMutation = useUploadStudentPhoto();
+  const resendCredentialsMutation = useResendStudentCredentials();
   const { data: performance = [], isLoading: perfLoading } = useStudentPerformance(id);
 
   const [form, setForm] = useState({
@@ -118,6 +125,18 @@ export default function StudentDetailPage() {
     e.target.value = '';
   };
 
+  const handleResendCredentials = async () => {
+    try {
+      const result = await resendCredentialsMutation.mutateAsync(id);
+      showToast(
+        result.message,
+        result.emailStatus === 'FAILED' ? 'warning' : 'success',
+      );
+    } catch (err) {
+      showToast(getApiError(err), 'error');
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="p-6 max-w-2xl mx-auto space-y-4">
@@ -146,6 +165,13 @@ export default function StudentDetailPage() {
           ← Students
         </Link>
         <h1 className="text-2xl font-semibold text-slate-800 flex-1">{student.user.name}</h1>
+        <button
+          onClick={handleResendCredentials}
+          disabled={resendCredentialsMutation.isPending}
+          className="px-3 py-1.5 text-sm text-blue-700 hover:text-blue-800 border border-blue-200 rounded-lg hover:bg-blue-50 disabled:opacity-60"
+        >
+          {resendCredentialsMutation.isPending ? 'Queueing…' : 'Resend Credentials'}
+        </button>
         <button
           onClick={() => setShowDeleteDialog(true)}
           className="px-3 py-1.5 text-sm text-red-600 hover:text-red-700 border border-red-200 rounded-lg hover:bg-red-50"
@@ -263,6 +289,20 @@ export default function StudentDetailPage() {
               Active
             </span>
           )}
+        </div>
+        <div>
+          <span className="text-slate-500">Email delivery: </span>
+          <span
+            className={`px-2 py-0.5 text-xs rounded-full ${
+              student.emailStatus === 'SENT'
+                ? 'bg-green-100 text-green-700'
+                : student.emailStatus === 'FAILED'
+                ? 'bg-red-100 text-red-700'
+                : 'bg-blue-100 text-blue-700'
+            }`}
+          >
+            {student.emailStatus}
+          </span>
         </div>
         {student.user.lastLoginAt && (
           <div>

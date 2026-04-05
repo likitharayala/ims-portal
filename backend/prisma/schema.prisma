@@ -87,6 +87,10 @@ model User {
   name                        String    @db.VarChar(255)
   email                       String    @unique @db.VarChar(255)
   phone                       String?   @db.VarChar(20)
+  authProvider                AuthProvider @default(custom) @map("auth_provider")
+  authMigratedAt              DateTime? @map("auth_migrated_at") @db.Timestamptz()
+  supabaseAuthId              String?   @unique @map("supabase_auth_id") @db.Uuid
+  authMigrationStatus         String?   @map("auth_migration_status") @db.VarChar(20)
   passwordHash                String    @map("password_hash") @db.VarChar(255)
   sessionId                   String?   @map("session_id") @db.Uuid
   refreshTokenHash            String?   @map("refresh_token_hash") @db.VarChar(255)
@@ -133,6 +137,10 @@ model Student {
   profilePhotoPath String?   @map("profile_photo_path") @db.VarChar(500)
   feeAmount        Decimal   @map("fee_amount") @db.Decimal(10, 2)
   joinedDate       DateTime  @default(now()) @map("joined_date") @db.Timestamptz()
+  emailSent        Boolean   @default(false) @map("email_sent")
+  emailSentAt      DateTime? @map("email_sent_at") @db.Timestamptz()
+  emailStatus      String    @default("PENDING") @map("email_status") @db.VarChar(20)
+  emailRetryCount  Int       @default(0) @map("email_retry_count")
   isDeleted        Boolean   @default(false) @map("is_deleted")
   deletedAt        DateTime? @map("deleted_at") @db.Timestamptz()
   deletedBy        String?   @map("deleted_by") @db.Uuid
@@ -226,6 +234,11 @@ enum DifficultyLevel {
   easy
   medium
   hard
+}
+
+enum AuthProvider {
+  custom
+  supabase
 }
 
 model Assessment {

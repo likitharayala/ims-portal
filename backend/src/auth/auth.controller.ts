@@ -22,6 +22,7 @@ import {
 } from './dto/auth.dto';
 import { Public } from '../common/decorators/public.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { AllowDuringPasswordChange } from '../common/decorators/allow-during-password-change.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { JwtPayload } from '../common/decorators/current-user.decorator';
 import type { Request } from 'express';
@@ -70,6 +71,7 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Post('logout')
   @HttpCode(HttpStatus.OK)
+  @AllowDuringPasswordChange()
   logout(@CurrentUser() user: JwtPayload) {
     return this.authService.logout(user.sub, user.institute_id);
   }
@@ -91,6 +93,7 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Post('change-password')
   @HttpCode(HttpStatus.OK)
+  @AllowDuringPasswordChange()
   changePassword(
     @CurrentUser() user: JwtPayload,
     @Body() dto: ChangePasswordDto,
@@ -100,6 +103,7 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Get('me')
+  @AllowDuringPasswordChange()
   getMe(@CurrentUser() user: JwtPayload) {
     return this.authService.getMe(user.sub);
   }

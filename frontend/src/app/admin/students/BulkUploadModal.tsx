@@ -13,22 +13,6 @@ interface Props {
   onClose: () => void;
 }
 
-function downloadCredentialsCSV(
-  credentials: Array<{ name: string; email: string; tempPassword: string }>,
-) {
-  const header = 'Name,Email,Temporary Password\n';
-  const rows = credentials
-    .map((c) => `"${c.name}","${c.email}","${c.tempPassword}"`)
-    .join('\n');
-  const blob = new Blob([header + rows], { type: 'text/csv' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'student-credentials.csv';
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
 function downloadErrorReport(
   errors: Array<{ row: number; email: string; reason: string }>,
 ) {
@@ -214,7 +198,9 @@ export function BulkUploadModal({ onClose }: Props) {
           <div className="text-center py-10">
             <div className="inline-block w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-4" />
             <p className="text-slate-700 font-medium">Processing file…</p>
-            <p className="text-xs text-slate-400 mt-1">Creating student accounts. Please wait.</p>
+            <p className="text-xs text-slate-400 mt-1">
+              Creating student accounts and queueing credential emails. Please wait.
+            </p>
           </div>
         )}
 
@@ -231,15 +217,25 @@ export function BulkUploadModal({ onClose }: Props) {
                 <p className="text-3xl font-bold text-amber-700">{result.skipped}</p>
                 <p className="text-xs text-amber-600 mt-1 font-medium">Skipped</p>
               </div>
-              <div className="text-center p-4 bg-slate-50 rounded-xl border border-slate-200">
-                <p className="text-3xl font-bold text-slate-700">{result.errors.length}</p>
-                <p className="text-xs text-slate-500 mt-1 font-medium">Errors</p>
+              <div className="text-center p-4 bg-blue-50 rounded-xl border border-blue-100">
+                <p className="text-3xl font-bold text-blue-700">{result.queuedForEmail}</p>
+                <p className="text-xs text-blue-600 mt-1 font-medium">Emails Queued</p>
               </div>
             </div>
 
             <p className="text-xs text-slate-500 text-center">
               Total processed: <strong>{total}</strong> row{total !== 1 ? 's' : ''}
             </p>
+
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-800">
+              Credentials are emailed automatically for created students. No plaintext passwords are returned or downloadable.
+            </div>
+
+            {result.emailQueueFailures > 0 && (
+              <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
+                {result.emailQueueFailures} student{result.emailQueueFailures !== 1 ? 's' : ''} were created, but credential delivery could not be queued. Retry from the student management flow after email service is restored.
+              </div>
+            )}
 
             {/* Error list */}
             {result.errors.length > 0 && (
@@ -267,24 +263,6 @@ export function BulkUploadModal({ onClose }: Props) {
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
-
-            {/* Credentials download */}
-            {result.credentials.length > 0 && (
-              <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl">
-                <p className="text-blue-800 font-semibold text-sm mb-1">
-                  {result.credentials.length} credential{result.credentials.length !== 1 ? 's' : ''} generated
-                </p>
-                <p className="text-blue-700 text-xs mb-3">
-                  Download now and share with students. Passwords are shown only once.
-                </p>
-                <button
-                  onClick={() => downloadCredentialsCSV(result.credentials)}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 font-medium"
-                >
-                  Download Credentials CSV
-                </button>
               </div>
             )}
 

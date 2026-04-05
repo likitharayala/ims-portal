@@ -109,6 +109,13 @@ api.interceptors.response.use(
       if (body?.error?.code === 'FEATURE_DISABLED' && typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('feature-disabled'));
       }
+      if (
+        body?.error?.code === 'PASSWORD_CHANGE_REQUIRED' &&
+        typeof window !== 'undefined' &&
+        window.location.pathname !== '/change-password'
+      ) {
+        window.location.href = '/change-password';
+      }
     }
 
     return Promise.reject(error);

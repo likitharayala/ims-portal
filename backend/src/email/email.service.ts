@@ -52,6 +52,34 @@ export class EmailService {
     });
   }
 
+  async sendStudentOnboardingEmail(options: {
+    email: string;
+    name: string;
+    instituteName: string;
+    temporaryPassword: string;
+  }): Promise<void> {
+    const frontendUrl = this.config.get<string>('FRONTEND_URL');
+    const loginUrl = `${frontendUrl}/login`;
+
+    await this.send({
+      to: options.email,
+      subject: `Welcome to ${options.instituteName} - Your Student Portal Access`,
+      html: `
+        <p>Dear ${options.name},</p>
+        <p>Your student account for <strong>${options.instituteName}</strong> has been successfully provisioned.</p>
+        <p>You may now access the student portal using the credentials below:</p>
+        <p><strong>Student Email:</strong> ${options.email}</p>
+        <p><strong>Temporary Password:</strong> ${options.temporaryPassword}</p>
+        <p><a href="${loginUrl}" style="background:#3b82f6;color:#fff;padding:10px 20px;text-decoration:none;border-radius:6px;">Access Portal</a></p>
+        <p>For security purposes, you will be required to reset your password during your first login.</p>
+        <p><strong>Security Notice:</strong></p>
+        <p>Do not share these credentials. Change your password immediately after signing in, and contact your institute admin if you face any issues.</p>
+        <p>Regards,<br />${options.instituteName}<br />Student Management Platform</p>
+        <p style="color:#64748b;font-size:12px;">This is an automated email. Do not reply.</p>
+      `,
+    });
+  }
+
   private async send(options: { to: string; subject: string; html: string }): Promise<void> {
     try {
       await this.transporter.sendMail({
