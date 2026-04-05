@@ -161,9 +161,6 @@ export class SupabaseAuthService {
   }
 
   private getClientApiKey(): string {
-    return (
-      this.config.get<string>('SUPABASE_ANON_KEY') ??
-      this.config.getOrThrow<string>('SUPABASE_SERVICE_ROLE_KEY')
-    );
+    return this.config.getOrThrow<string>('SUPABASE_SERVICE_ROLE_KEY');
   }
 }

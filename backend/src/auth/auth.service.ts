@@ -86,9 +86,13 @@ export class AuthService {
       throw new InternalServerErrorException('Admin role not seeded');
     }
 
-    const rawToken = crypto.randomBytes(32).toString('hex');
-    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const rawToken = supabaseProvisioningEnabled
+      ? null
+      : crypto.randomBytes(32).toString('hex');
+    const tokenHash = rawToken
+      ? crypto.createHash('sha256').update(rawToken).digest('hex')
+      : null;
+    const expiresAt = rawToken ? new Date(Date.now() + 24 * 60 * 60 * 1000) : null;
 
     const result = await this.userProvisioning.createLocalAdminProvisioning({
       instituteName: dto.instituteName,
@@ -99,7 +103,7 @@ export class AuthService {
       adminName: dto.name,
       passwordHash,
       isEmailVerified: false,
-      authProvider: 'custom',
+      authProvider: supabaseProvisioningEnabled ? 'supabase' : 'custom',
       authMigratedAt: null,
       authMigrationStatus: supabaseProvisioningEnabled ? 'pending' : null,
       emailVerificationToken: tokenHash,
@@ -125,13 +129,15 @@ export class AuthService {
       instituteId,
       featureIds,
     });
-    void this.triggerAdminVerificationEmail({
-      email: result.user.email,
-      name: result.user.name,
-      token: rawToken,
-      instituteId,
-      userId,
-    });
+    if (!supabaseProvisioningEnabled && rawToken) {
+      void this.triggerAdminVerificationEmail({
+        email: result.user.email,
+        name: result.user.name,
+        token: rawToken,
+        instituteId,
+        userId,
+      });
+    }
     void this.triggerSignupAuditLog(instituteId, userId);
 
     return {

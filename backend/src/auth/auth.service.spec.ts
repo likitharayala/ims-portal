@@ -547,7 +547,7 @@ describe('AuthService', () => {
       expect(userProvisioningService.createLocalAdminProvisioning).toHaveBeenCalledWith(
         expect.objectContaining({
           normalizedEmail: 'admin@example.com',
-          authProvider: 'custom',
+          authProvider: 'supabase',
           authMigrationStatus: 'pending',
         }),
       );
@@ -562,21 +562,15 @@ describe('AuthService', () => {
         instituteId: 'institute-1',
         featureIds: [1],
       });
-      expect(userProvisioningService.sendAdminVerificationEmail).toHaveBeenCalledWith({
-        userId: 'user-1',
-        instituteId: 'institute-1',
-        email: 'admin@example.com',
-        name: 'Admin',
-        rawToken: expect.any(String),
-      });
+      expect(userProvisioningService.sendAdminVerificationEmail).not.toHaveBeenCalled();
       expect(result).toEqual({
         message: 'Account created. Please verify your email to continue.',
       });
     });
 
-    it('does not wait for background email sending', async () => {
+    it('does not wait for background email sending on the legacy verification path', async () => {
       configService.get.mockImplementation((key: string) => {
-        if (key === 'SUPABASE_PROVISIONING_ENABLED') return 'true';
+        if (key === 'SUPABASE_PROVISIONING_ENABLED') return 'false';
         return undefined;
       });
       userProvisioningService.validateAdminSignup.mockResolvedValue(undefined);
@@ -612,6 +606,7 @@ describe('AuthService', () => {
         message: 'Account created. Please verify your email to continue.',
       });
       expect(userProvisioningService.sendAdminVerificationEmail).toHaveBeenCalled();
+      expect(userProvisioningService.provisionAdminSupabaseUser).not.toHaveBeenCalled();
     });
 
     it('does not wait for background feature provisioning', async () => {
@@ -660,7 +655,7 @@ describe('AuthService', () => {
 
     it('does not block signup when background tasks fail', async () => {
       configService.get.mockImplementation((key: string) => {
-        if (key === 'SUPABASE_PROVISIONING_ENABLED') return 'true';
+        if (key === 'SUPABASE_PROVISIONING_ENABLED') return 'false';
         return undefined;
       });
       userProvisioningService.validateAdminSignup.mockResolvedValue(undefined);
@@ -681,9 +676,6 @@ describe('AuthService', () => {
       userProvisioningService.provisionAdminInstituteFeatures.mockRejectedValue(
         new Error('feature failed'),
       );
-      userProvisioningService.provisionAdminSupabaseUser.mockRejectedValue(
-        new Error('supabase create failed'),
-      );
       auditLog.record.mockRejectedValue(new Error('audit failed'));
 
       const result = await service.signup({
@@ -701,6 +693,7 @@ describe('AuthService', () => {
       await new Promise((resolve) => setImmediate(resolve));
       expect(userProvisioningService.sendAdminVerificationEmail).toHaveBeenCalled();
       expect(userProvisioningService.provisionAdminInstituteFeatures).toHaveBeenCalled();
+      expect(userProvisioningService.provisionAdminSupabaseUser).not.toHaveBeenCalled();
       expect(auditLog.record).toHaveBeenCalledWith({
         instituteId: 'institute-1',
         userId: 'user-1',

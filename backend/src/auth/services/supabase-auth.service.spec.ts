@@ -25,12 +25,7 @@ describe('SupabaseAuthService', () => {
     fetchMock = jest.fn();
     global.fetch = fetchMock as unknown as typeof fetch;
 
-    configService.get.mockImplementation((key: string) => {
-      if (key === 'SUPABASE_ANON_KEY') {
-        return 'anon-key';
-      }
-      return undefined;
-    });
+    configService.get.mockReturnValue(undefined);
 
     configService.getOrThrow.mockImplementation((key: string) => {
       if (key === 'SUPABASE_URL') {
@@ -84,7 +79,7 @@ describe('SupabaseAuthService', () => {
       expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({
-          apikey: 'anon-key',
+          apikey: 'service-role-key',
           'Content-Type': 'application/json',
         }),
       }),
@@ -221,7 +216,7 @@ describe('SupabaseAuthService', () => {
       expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({
-          apikey: 'anon-key',
+          apikey: 'service-role-key',
           'Content-Type': 'application/json',
         }),
       }),

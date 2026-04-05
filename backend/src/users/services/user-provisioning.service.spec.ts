@@ -6,6 +6,7 @@ import { UserProvisioningService } from './user-provisioning.service';
 
 describe('UserProvisioningService', () => {
   let service: UserProvisioningService;
+  const originalFetch = global.fetch;
 
   const prisma = {
     institute: {
@@ -40,7 +41,14 @@ describe('UserProvisioningService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    process.env.SUPABASE_URL = 'https://project-ref.supabase.co';
+    process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-role-key';
+    global.fetch = jest.fn() as unknown as typeof fetch;
     service = new UserProvisioningService(prisma as any, emailService as any, supabaseAdmin as any);
+  });
+
+  afterAll(() => {
+    global.fetch = originalFetch;
   });
 
   const setupTransactionalState = (options?: {
@@ -275,9 +283,14 @@ describe('UserProvisioningService', () => {
       isDeleted: false,
     });
     supabaseAdmin.findUserByEmail.mockResolvedValue(null);
-    supabaseAdmin.createUser.mockResolvedValue({
-      id: 'auth-user-1',
-      email: 'admin@example.com',
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: jest.fn().mockResolvedValue({
+        user: {
+          id: 'auth-user-1',
+          email: 'admin@example.com',
+        },
+      }),
     });
     prisma.user.update.mockResolvedValue(undefined);
 
@@ -290,15 +303,28 @@ describe('UserProvisioningService', () => {
       }),
     ).resolves.toBe(true);
 
-    expect(supabaseAdmin.createUser).toHaveBeenCalledWith('admin@example.com', {
-      password: 'Password123',
-      emailConfirm: true,
-      userMetadata: {
-        source: 'admin_signup_background',
-        localUserId: 'user-1',
-        instituteId: 'institute-1',
+    expect(global.fetch).toHaveBeenCalledWith(
+      'https://project-ref.supabase.co/auth/v1/signup',
+      {
+        method: 'POST',
+        headers: {
+          apikey: 'service-role-key',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: 'admin@example.com',
+          password: 'Password123',
+          options: {
+            emailRedirectTo: '/auth/callback',
+            data: {
+              source: 'admin_signup_background',
+              localUserId: 'user-1',
+              instituteId: 'institute-1',
+            },
+          },
+        }),
       },
-    });
+    );
     expect(prisma.user.update).toHaveBeenCalledWith({
       where: { id: 'user-1' },
       data: {
@@ -365,7 +391,7 @@ describe('UserProvisioningService', () => {
       plaintextPassword: 'Password123',
     });
 
-    expect(supabaseAdmin.createUser).not.toHaveBeenCalled();
+    expect(global.fetch).not.toHaveBeenCalled();
     expect(prisma.user.update).toHaveBeenCalledWith({
       where: { id: 'user-1' },
       data: {

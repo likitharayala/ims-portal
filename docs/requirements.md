@@ -46,6 +46,75 @@ This does **not** change:
 
 SMTP or SendGrid support can be added later behind `EMAIL_PROVIDER` without changing signup flow, provisioning flow, or background retry logic.
 
+## Supabase Email Verification Flow
+
+### Summary
+
+When `SUPABASE_PROVISIONING_ENABLED=true`, admin signup now relies on Supabase email verification instead of the legacy custom verification email.
+
+### Flow
+
+1. Admin signup creates the local admin record.
+2. Background Supabase provisioning creates the Supabase auth user with email verification enabled.
+3. Supabase sends the verification email.
+4. The email redirect returns the user to:
+   - `/auth/callback`
+5. The frontend callback page verifies the Supabase session and shows a success or failure state.
+6. On success, the user is redirected to `/login`.
+
+### Redirect Handling
+
+The Supabase verification redirect target is now:
+
+- `${FRONTEND_URL}/auth/callback`
+
+The callback page is responsible for handling the verification return path. The backend no longer relies on the old custom verification page for Supabase-provisioned admin signup.
+
+### Backend Trust Model
+
+For Supabase-provisioned users, the backend trusts Supabase verification instead of sending a duplicate local verification email.
+
+This avoids conflicting verification links and keeps verification behavior aligned with the auth provider that owns the user session.
+
+## Supabase Key Usage Rules
+
+### Backend Only
+
+The Supabase service role key is backend-only.
+
+Allowed backend environment variables:
+
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+The service role key is used for:
+
+- admin user creation
+- invite flows
+- auth user deletion
+- migration linking
+- backend-to-Supabase auth server requests
+
+### Frontend Only
+
+The frontend must only use the public anon key.
+
+Allowed frontend environment variables:
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+
+### Security Rules
+
+- `SUPABASE_SERVICE_ROLE_KEY` must never be exposed to the browser
+- frontend code must never call Supabase admin APIs
+- frontend code must never read backend-only env vars
+- backend code must not depend on frontend public anon key
+
+### Security Rationale
+
+The service role key grants elevated privileges and can bypass normal client restrictions. Keeping it backend-only prevents browser-side escalation and protects admin operations from exposure.
+
 ## Admin Signup Flow (Phase 1)
 
 ### Summary

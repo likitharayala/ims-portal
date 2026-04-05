@@ -25,7 +25,6 @@ describe('Auth module wiring', () => {
           useValue: {
             get: jest.fn((key: string) => {
               if (key === 'DUAL_AUTH_ENABLED') return 'false';
-              if (key === 'SUPABASE_ANON_KEY') return 'anon-key';
               if (key === 'SUPABASE_JWT_AUDIENCE') return 'authenticated';
               return undefined;
             }),

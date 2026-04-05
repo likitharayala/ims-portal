@@ -353,15 +353,15 @@ export class UserProvisioningService {
         }
       } else {
         if (input.plaintextPassword) {
-          authUser = await this.supabaseAdmin.createUser(normalizedEmail, {
-            password: input.plaintextPassword,
-            emailConfirm: true,
-            userMetadata: {
+          authUser = await this.signUpSupabaseUserWithVerification(
+            normalizedEmail,
+            input.plaintextPassword,
+            {
               source: 'admin_signup_background',
               localUserId: input.userId,
               instituteId: input.instituteId,
             },
-          });
+          );
         } else {
           const inviteResult = await this.supabaseAdmin.inviteUserByEmail(normalizedEmail, {
             redirectTo: this.getSupabaseInviteRedirectUrl(),
@@ -874,7 +874,57 @@ export class UserProvisioningService {
 
   private getSupabaseInviteRedirectUrl(): string {
     const frontendUrl = process.env.FRONTEND_URL?.replace(/\/+$/, '') ?? '';
-    return `${frontendUrl}/auth/complete-invite`;
+    return `${frontendUrl}/auth/callback`;
+  }
+
+  private async signUpSupabaseUserWithVerification(
+    email: string,
+    password: string,
+    metadata: Record<string, unknown>,
+  ): Promise<SupabaseAdminUser> {
+    const supabaseUrl = process.env.SUPABASE_URL?.replace(/\/+$/, '') ?? '';
+    const apiKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? '';
+
+    if (!supabaseUrl || !apiKey) {
+      throw new Error('Supabase signup configuration is missing');
+    }
+
+    const response = await fetch(`${supabaseUrl}/auth/v1/signup`, {
+      method: 'POST',
+      headers: {
+        apikey: apiKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email,
+        password,
+        options: {
+          emailRedirectTo: this.getSupabaseInviteRedirectUrl(),
+          data: metadata,
+        },
+      }),
+    });
+
+    const payload = (await response.json().catch(() => ({}))) as {
+      user?: { id?: string; email?: string };
+      msg?: string;
+      error?: string;
+      error_description?: string;
+    };
+
+    if (!response.ok || !payload.user?.id) {
+      throw new Error(
+        payload.error_description ??
+          payload.msg ??
+          payload.error ??
+          'supabase_signup_failed',
+      );
+    }
+
+    return {
+      id: payload.user.id,
+      email: payload.user.email ?? email,
+    };
   }
 
   private async rotateVerificationToken(userId: string): Promise<string> {
