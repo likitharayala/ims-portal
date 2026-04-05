@@ -19,14 +19,19 @@
 |---|---|---|---|
 | GET | `/admin/students` | admin | students |
 | GET | `/admin/students/export` | admin | students |
+| GET | `/admin/students/bulk-upload/template` | admin | students |
+| GET | `/admin/students/filter-options` | admin | students |
 | GET | `/admin/students/:id` | admin | students |
 | GET | `/admin/students/:id/performance` | admin | students |
 | POST | `/admin/students` | admin | students |
 | POST | `/admin/students/bulk-upload` | admin | students |
 | PUT | `/admin/students/:id` | admin | students |
 | DELETE | `/admin/students/:id` | admin | students |
+| POST | `/admin/students/:id/reinstate` | admin | students |
+| POST | `/admin/students/:id/profile-photo` | admin | students |
 | GET | `/student/profile` | student | — |
 | PUT | `/student/profile` | student | — |
+| POST | `/student/profile/photo` | student | — |
 
 ---
 
@@ -153,6 +158,68 @@
 5. Return Excel file as buffer with Content-Disposition: attachment
 6. AuditLog: action=EXPORT, resource_type=students
 ```
+
+#### `getFilterOptions(context)` — populates class and school dropdowns
+
+```
+1. SELECT DISTINCT class FROM students
+   WHERE institute_id = $ctx.instituteId AND is_deleted = false
+   ORDER BY class ASC
+
+2. SELECT DISTINCT school FROM students
+   WHERE institute_id = $ctx.instituteId AND is_deleted = false
+   ORDER BY school ASC
+
+3. Return { classes: string[], schools: string[] }
+```
+
+#### `downloadBulkUploadTemplate(context)` — Excel template download
+
+```
+1. ExcelTemplateService.generateTemplate()
+2. Template columns (in order):
+   Name* | Email* | Phone* | Class* | School* | Fee Amount* |
+   Roll Number | Date of Birth | Address | Parent Name | Parent Phone
+   (* = required, rest optional)
+3. Include one sample row in the template
+4. Return Excel buffer with Content-Disposition: attachment; filename="student-upload-template.xlsx"
+5. AuditLog: NOT logged (read-only utility)
+```
+
+#### `uploadProfilePhoto(studentId, file, context)` — admin uploads student photo
+
+```
+1. Fetch student WHERE id AND institute_id AND is_deleted = false
+2. Validate file: MIME (image/jpeg, image/png) + extension + max 5MB
+3. Upload to MinIO: /{institute_id}/profiles/{student_id}.{ext}
+   (Overwrites existing photo at same path — no versioning)
+4. UPDATE students SET profile_image_url = minio_path
+5. AuditLog: action=UPDATE, resource_type=students, new_values={profile_image_url}
+6. Return { profile_image_url }
+
+Note: profile_image_url stored as MinIO path, not pre-signed URL.
+Pre-signed URL generated on demand by GET /admin/students/:id or GET /student/profile.
+```
+
+#### `reinstateStudent(studentId, context)` — admin recovers a soft-deleted student
+
+```
+1. Fetch student WHERE id = $id AND institute_id = $ctx.instituteId AND is_deleted = TRUE
+   → If not found (never existed or wrong institute): throw NotFoundException
+2. BEGIN TRANSACTION:
+   a. UPDATE students SET is_deleted=false, deleted_at=null, deleted_by=null
+   b. UPDATE users    SET is_deleted=false, deleted_at=null, deleted_by=null,
+                          is_active=true, must_change_password=true
+      → must_change_password forced to true — student must reset password on next login
+3. COMMIT
+4. AuditLog: action=REINSTATE, resource_type=students, resource_id=student.id
+5. Return reinstated student object
+
+Note: Session is not restored — student must log in again with a new password.
+Admin must share new credentials (no auto-generate here — admin resets via must_change_password flag).
+```
+
+**Endpoint:** `POST /admin/students/:id/reinstate` — add to controller table.
 
 #### `getStudentPerformance(studentId, context)`
 
@@ -418,8 +485,10 @@ Search:   admin-only GIN full-text on (title, subject, author)
 | POST | `/admin/assessments/:id/duplicate` | admin | assessments |
 | DELETE | `/admin/assessments/:id` | admin | assessments |
 | POST | `/admin/assessments/:id/questions` | admin | assessments |
+| POST | `/admin/assessments/:id/questions/bulk` | admin | assessments |
 | PUT | `/admin/assessments/:id/questions/:qid` | admin | assessments |
 | DELETE | `/admin/assessments/:id/questions/:qid` | admin | assessments |
+| POST | `/admin/assessments/:id/questions/:qid/image` | admin | assessments |
 | POST | `/admin/assessments/:id/ai-generate` | admin | assessments + ai_generation |
 | GET | `/admin/assessments/:id/submissions` | admin | assessments |
 | GET | `/admin/assessments/:id/submissions/:sid` | admin | assessments |
@@ -532,8 +601,8 @@ Runs every 60 seconds:
    e. If type = 'mcq':
       - options must have exactly 4 items
       - each option must have label in ['A','B','C','D'] and non-empty text
-      - exactly one option must have is_correct = true
-      - correct_option must match the is_correct option's label
+      - options must NOT contain is_correct field (removed from schema — use correct_option only)
+      - correct_option must be provided and must be one of: 'A', 'B', 'C', 'D'
    f. Total questions count < 100
       → If count = 100: throw 'Maximum 100 questions per assessment'
 3. Recalculate and UPDATE assessments.total_marks += dto.marks
@@ -559,11 +628,47 @@ Runs every 60 seconds:
 #### `deleteQuestion(assessmentId, questionId, context)`
 
 ```
-1. Fetch question
-2. UPDATE assessments.total_marks -= question.marks
-3. DELETE FROM assessment_questions WHERE id = $questionId
-   (Hard delete — questions are not soft-deleted. Submissions already have answers captured.)
-4. AuditLog: action=DELETE, resource_type=assessment_questions
+1. Fetch assessment WHERE id AND institute_id AND is_deleted = false
+2. Check assessment.status = 'draft'
+   → If status != 'draft': throw BadRequestException(
+       'Questions cannot be deleted after publishing. Duplicate the assessment to restructure it.')
+3. Fetch question WHERE id AND assessment_id
+4. BEGIN TRANSACTION:
+   a. UPDATE assessments SET total_marks -= question.marks
+   b. DELETE FROM assessment_questions WHERE id = $questionId
+      (Hard delete — questions are not soft-deleted)
+5. COMMIT
+6. AuditLog: action=DELETE, resource_type=assessment_questions
+```
+
+#### `bulkAddQuestions(assessmentId, questionsDto, context)` — saves AI-reviewed questions
+
+```
+questionsDto: { questions: QuestionDto[] }
+
+1. Fetch assessment WHERE id AND institute_id AND is_deleted = false
+2. Validate assessment.status = 'draft'
+   → If not draft: throw 'Questions can only be added to draft assessments'
+3. Validate each question (same rules as addQuestion step 2)
+4. Check total count: existing_count + questions.length <= 100
+5. BEGIN TRANSACTION:
+   a. INSERT all questions in batch
+   b. UPDATE assessments.total_marks += SUM(all new question marks)
+6. COMMIT
+7. AuditLog: action=CREATE, resource_type=assessment_questions,
+             new_values={ count: questions.length }
+8. Return { created: count, assessment_total_marks: updated_total }
+```
+
+**Question status rule (applies to addQuestion, editQuestion, deleteQuestion, bulkAddQuestions):**
+```
+DRAFT:      Add / Edit / Delete allowed
+PUBLISHED:  Add / Edit allowed. Delete BLOCKED.
+ACTIVE:     Add / Edit allowed. Delete BLOCKED.
+            (Edge case: admin adds a question mid-exam. Student refreshes and sees the new question.
+            This is by design — admin has full control. Frontend warns before saving.)
+CLOSED:     All question modifications BLOCKED (submissions already captured)
+EVALUATED:  All question modifications BLOCKED
 ```
 
 #### `duplicateAssessment(id, context)`
@@ -610,7 +715,10 @@ Runs every 60 seconds:
           Else:
             answer.marks_awarded = 0
 
-4. UPDATE submissions.answers = updated_answers_jsonb
+4. UPDATE submissions SET
+     answers = updated_answers_jsonb,
+     evaluation_type = 'auto'   ← mark as system-evaluated
+   WHERE assessment_id = $id AND status = 'submitted'
 
 5. Note: Typed MCQ answers are now read-only for admin during evaluation.
          Only MCQ answers from upload_files remain manually evaluated via ✓/✗ toggle.
@@ -776,7 +884,11 @@ evaluationDto: {
 3. Calculate total_marks_awarded:
    total = SUM of all answer.marks_awarded (including auto-evaluated MCQ marks)
    total = MAX(0, total)  ← cap at 0, never negative
-4. UPDATE submissions SET total_marks_awarded = total, evaluated_at = now()
+4. UPDATE submissions SET
+     total_marks_awarded = total,
+     evaluated_at = now(),
+     evaluation_type = 'manual',    ← mark as admin-evaluated
+     evaluated_by = $ctx.userId
 5. AuditLog: action=FINALISE_EVALUATION
 6. Return { total_marks_awarded, warning_questions }
 ```
@@ -1066,12 +1178,14 @@ ORDER BY month DESC, student name ASC
 #### `updatePaymentStatus(paymentId, dto, context)`
 
 ```
-dto: { status: 'pending' | 'paid' | 'overdue', notes?: string }
+dto: { status: 'pending' | 'paid' | 'overdue', reference?: string, notes?: string }
 
 1. Fetch payment WHERE id AND institute_id AND is_deleted = false
 2. Validate status transition (all transitions allowed by admin)
 3. Capture old_values
-4. UPDATE payments SET status = dto.status, notes = dto.notes,
+4. UPDATE payments SET status = dto.status,
+                       reference = dto.reference,
+                       notes = dto.notes,
                        paid_at = (if status='paid' then now() else null),
                        updated_by = $ctx.userId
 5. AuditLog: action=UPDATE, resource_type=payments, old_values, new_values
@@ -1140,7 +1254,7 @@ Note: Same rule — applies from next month. Past records unchanged.
 ```
 1. Apply same filters as listPayments but NO pagination — fetch all matching records
 2. Build Excel using ExcelTemplateService:
-   Columns: Student Name, Roll Number, Class, Month, Amount (₹), Status, Notes
+   Columns: Student Name, Roll Number, Class, Month, Amount (₹), Status, Reference, Paid At, Notes
 3. Return Excel file as buffer
 4. AuditLog: action=EXPORT, resource_type=payments
 ```
@@ -1276,6 +1390,7 @@ Export:   no pagination — all matching records
 | GET | `/admin/notifications/unread-count` | admin | — |
 | GET | `/student/notifications` | student | — |
 | PATCH | `/student/notifications/:id/read` | student | — |
+| PATCH | `/student/notifications/read-all` | student | — |
 | DELETE | `/student/notifications/:id` | student | — |
 | GET | `/student/notifications/unread-count` | student | — |
 
@@ -1330,6 +1445,13 @@ dto: {
 5. AuditLog: action=CREATE, resource_type=notifications,
              new_values={ title, type, recipient_count }
 6. Return notification with recipient_count
+
+**Phase 1 limitation — synchronous fan-out:**
+The INSERT in step 3b is synchronous. For an institute with 5,000 students, this is 5,000 DB inserts
+in a single request. The HTTP response may take several seconds. Admins should be informed via the
+UI that sending to large groups takes a moment.
+Phase 2 fix: INSERT the notification row, enqueue a BullMQ job for fan-out, return immediately.
+The job does the recipient inserts in batches of 100 with retry semantics.
 ```
 
 **Payment reminder auto-population (frontend concern, backend validates):**
@@ -1382,6 +1504,17 @@ WHERE nr.student_id = $ctx.studentId
   AND nr.is_dismissed = false   -- dismissed notifications excluded
 ORDER BY n.created_at DESC
 LIMIT 20 OFFSET ...
+```
+
+#### `markAllAsRead(context)` — student marks all notifications as read
+
+```
+1. UPDATE notification_recipients
+   SET is_read = true, read_at = now()
+   WHERE student_id = $ctx.studentId
+     AND is_read = false
+     AND is_dismissed = false
+2. Return { updated: count }
 ```
 
 #### `markAsRead(notificationId, context)` — student marks read
@@ -1480,6 +1613,84 @@ No filters — notifications list is in chronological order only
 
 ---
 
+---
+
+## Module 6 — Dashboard
+
+### 6.1 Controller Endpoints
+
+| Method | Route | Role | Feature Required |
+|---|---|---|---|
+| GET | `/admin/dashboard` | admin | — |
+
+No feature guard — dashboard always visible. Stats only show data for features the institute has enabled.
+
+---
+
+### 6.2 Service Flow
+
+#### `getDashboardStats(context)`
+
+```
+Runs all queries fresh on every load (Phase 1). Redis cache with 5-min TTL in Phase 2.
+
+1. Total students:
+   SELECT COUNT(*) FROM students
+   WHERE institute_id = $ctx.instituteId AND is_deleted = false
+
+2. Pending payments count (only if payments feature enabled):
+   SELECT COUNT(*) FROM payments
+   WHERE institute_id = $ctx.instituteId AND status = 'pending' AND is_deleted = false
+
+3. Overdue payments count (only if payments feature enabled):
+   SELECT COUNT(*) FROM payments
+   WHERE institute_id = $ctx.instituteId AND status = 'overdue' AND is_deleted = false
+
+4. Upcoming assessments (only if assessments feature enabled):
+   SELECT id, title, start_at, end_at, status FROM assessments
+   WHERE institute_id = $ctx.instituteId
+     AND status IN ('published', 'active')
+     AND is_deleted = false
+   ORDER BY start_at ASC
+   LIMIT 5
+
+5. Recent notifications sent (only if notifications available):
+   SELECT COUNT(*) FROM notifications
+   WHERE institute_id = $ctx.instituteId
+     AND is_deleted = false
+     AND created_at >= now() - interval '7 days'
+
+6. Unread notification count across all students:
+   SELECT COUNT(*) FROM notification_recipients nr
+   JOIN notifications n ON nr.notification_id = n.id
+   WHERE n.institute_id = $ctx.instituteId
+     AND n.is_deleted = false
+     AND nr.is_read = false
+
+7. Return:
+{
+  "students": { "total": N },
+  "payments": { "pending": N, "overdue": N },   // null if payments feature disabled
+  "assessments": { "upcoming": [...5 items] },  // null if assessments feature disabled
+  "notifications": { "sent_last_7_days": N, "total_unread": N }
+}
+```
+
+**Feature-conditional stats:**
+Stats for a disabled feature are returned as `null` (not zero). The frontend renders a "Feature disabled" placeholder instead of a zero count, so admins know the data exists but the feature is off.
+
+---
+
+### 6.3 Security
+
+- `institute_id` from JWT — stats always scoped to caller's institute
+- No sensitive data — counts only, no student names or amounts
+- Feature-gated stat fields — disabled features return null, not 0
+
+---
+
+---
+
 ## Cross-Module Interactions
 
 ```
@@ -1513,9 +1724,10 @@ record({
   institute_id:  ctx.instituteId,
   actor_id:      ctx.userId,
   actor_role:    ctx.role,
-  action:        'CREATE' | 'UPDATE' | 'DELETE' | 'HIDE' | 'EVALUATE' | 'LOGIN' | 'LOGOUT'
-                 | 'BULK_UPLOAD' | 'EXPORT' | 'RELEASE_RESULTS' | 'AUTO_GENERATE_PAYMENTS'
-                 | 'AUTO_OVERDUE' | 'FINALISE_EVALUATION' | 'FLAG' | 'UNFLAG',
+  action:        'CREATE' | 'UPDATE' | 'DELETE' | 'HIDE' | 'UNHIDE' | 'EVALUATE' | 'LOGIN' | 'LOGOUT'
+                 | 'BULK_UPLOAD' | 'EXPORT' | 'PUBLISH' | 'RELEASE_RESULTS' | 'REINSTATE'
+                 | 'AUTO_GENERATE_PAYMENTS' | 'AUTO_OVERDUE' | 'FINALISE_EVALUATION'
+                 | 'FLAG' | 'UNFLAG' | 'PASSWORD_CHANGED' | 'PASSWORD_RESET',
   resource_type: 'students' | 'materials' | 'assessments' | 'payments' | 'notifications' | ...,
   resource_id:   UUID,
   old_values:    JSONB | null,
@@ -1540,5 +1752,6 @@ overwriteFile(buffer, path, contentType) → { url: minio_path }
 Path conventions:
   /{institute_id}/materials/{material_id}.pdf
   /{institute_id}/profiles/{student_id}.{jpg|png}
+  /{institute_id}/questions/{question_id}.{jpg|png}
   /{institute_id}/submissions/{submission_id}/{filename}
 ```
