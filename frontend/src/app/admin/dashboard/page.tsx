@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/lib/auth-store';
@@ -69,38 +70,46 @@ export default function AdminDashboardPage() {
 
       {/* Stat cards — 2×2 on mobile, 4-in-a-row on desktop */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <StatCard
-          label="Total Students"
-          value={stats?.totalStudents ?? 0}
-          sub="Active enrollments"
-          color="text-blue-700"
-          loading={isLoading}
-        />
-        <StatCard
-          label="Pending Payments"
-          value={stats?.pendingPayments.count ?? 0}
-          sub={
-            stats
-              ? `${formatINR(stats.pendingPayments.totalAmount)} outstanding`
-              : 'Loading…'
-          }
-          color="text-amber-600"
-          loading={isLoading}
-        />
-        <StatCard
-          label="Active Assessments"
-          value={stats?.activeAssessments ?? 0}
-          sub="Published + active"
-          color="text-green-700"
-          loading={isLoading}
-        />
-        <StatCard
-          label="Study Materials"
-          value={stats?.totalMaterials ?? 0}
-          sub="Visible to students"
-          color="text-purple-700"
-          loading={isLoading}
-        />
+        <Link href="/admin/students" className="block">
+          <StatCard
+            label="Total Students"
+            value={stats?.totalStudents ?? 0}
+            sub="Active enrollments"
+            color="text-blue-700"
+            loading={isLoading}
+          />
+        </Link>
+        <Link href="/admin/payments?tab=pending" className="block">
+          <StatCard
+            label="Pending Payments"
+            value={stats?.pendingPayments.count ?? 0}
+            sub={
+              stats
+                ? `${formatINR(stats.pendingPayments.totalAmount)} outstanding`
+                : 'Loading…'
+            }
+            color="text-amber-600"
+            loading={isLoading}
+          />
+        </Link>
+        <Link href="/admin/materials" className="block">
+          <StatCard
+            label="Study Materials"
+            value={stats?.totalMaterials ?? 0}
+            sub="Visible to students"
+            color="text-purple-700"
+            loading={isLoading}
+          />
+        </Link>
+        <Link href="/admin/assessments" className="block">
+          <StatCard
+            label="Active Assessments"
+            value={stats?.activeAssessments ?? 0}
+            sub="Published + active"
+            color="text-green-700"
+            loading={isLoading}
+          />
+        </Link>
       </div>
 
       {/* Empty state for new institutes */}
