@@ -1,0 +1,43 @@
+{
+  "cookies": [
+    {
+      "name": "accessToken",
+      "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyOWFkY2U1MS1mNzk2LTRkYTMtYTc2Ni0zZjQ0ZGFhYzVlMmMiLCJpbnN0aXR1dGVfaWQiOiIyOTY5NjNkNS1jNmEyLTRjYjktOTI5Ni03MjhkODBhZGE5YzEiLCJyb2xlIjoic3R1ZGVudCIsInNlc3Npb25faWQiOiIxNTIzNTJkOC00NGNjLTRhODItODE4NS02MjVjZjkwOTgyYTYiLCJpYXQiOjE3NzI4MjUxNDMsImV4cCI6MTc3MjgyNjA0M30.RoAUUkqQWvtko4fAsEXkWvnjqvvVqVEFGTrqEVJTTBo",
+      "domain": "localhost",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "userRole",
+      "value": "student",
+      "domain": "localhost",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    }
+  ],
+  "origins": [
+    {
+      "origin": "http://localhost:3000",
+      "localStorage": [
+        {
+          "name": "accessToken",
+          "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyOWFkY2U1MS1mNzk2LTRkYTMtYTc2Ni0zZjQ0ZGFhYzVlMmMiLCJpbnN0aXR1dGVfaWQiOiIyOTY5NjNkNS1jNmEyLTRjYjktOTI5Ni03MjhkODBhZGE5YzEiLCJyb2xlIjoic3R1ZGVudCIsInNlc3Npb25faWQiOiIxNTIzNTJkOC00NGNjLTRhODItODE4NS02MjVjZjkwOTgyYTYiLCJpYXQiOjE3NzI4MjUxNDMsImV4cCI6MTc3MjgyNjA0M30.RoAUUkqQWvtko4fAsEXkWvnjqvvVqVEFGTrqEVJTTBo"
+        },
+        {
+          "name": "user",
+          "value": "{\"id\":\"29adce51-f796-4da3-a766-3f44daac5e2c\",\"name\":\"Attendance Test Student\",\"email\":\"att.student@test.com\",\"role\":\"student\",\"instituteId\":\"296963d5-c6a2-4cb9-9296-728d80ada9c1\",\"mustChangePassword\":false}"
+        },
+        {
+          "name": "refreshToken",
+          "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyOWFkY2U1MS1mNzk2LTRkYTMtYTc2Ni0zZjQ0ZGFhYzVlMmMiLCJzZXNzaW9uX2lkIjoiMTUyMzUyZDgtNDRjYy00YTgyLTgxODUtNjI1Y2Y5MDk4MmE2IiwidHlwZSI6InJlZnJlc2giLCJpYXQiOjE3NzI4MjUxNDMsImV4cCI6MTc3MzQyOTk0M30.JDFTjKW1rDrbKbOadd1rdfk07Rt8NYWT9IjfL1-IgZ0"
+        }
+      ]
+    }
+  ]
+}

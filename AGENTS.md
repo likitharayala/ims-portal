@@ -1,0 +1,360 @@
+# AGENTS.md
+
+This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
+
+## Project Overview
+
+Teachly is a multi-tenant SaaS Institute Management System for tuition centres and small institutes. Each institute registers, selects features, and gets a dynamically configured portal.
+
+---
+
+## Commands
+
+```bash
+# Backend
+cd backend
+npm run start:dev          # start NestJS dev server (watch mode)
+npm run build              # production build
+npx prisma migrate dev --name <name>   # create + apply migration
+npx prisma generate        # regenerate Prisma client after schema change
+npx prisma validate        # validate schema
+npx prisma migrate status  # check pending migrations
+npx jest src/<module>/     # run tests for one module
+npx jest --coverage        # full test suite with coverage
+
+# Frontend
+cd frontend
+npm run dev                # start Next.js dev server
+npm run build              # production build
+npm run lint               # ESLint check
+```
+
+---
+
+## Technology Stack
+
+| Layer | Technology |
+|---|---|
+| Frontend | Next.js + TypeScript + Tailwind CSS (+ optional Shadcn UI) |
+| Backend | NestJS (TypeScript) |
+| Database | PostgreSQL hosted on **Supabase** |
+| Auth | JWT (access 15m + refresh 7d), bcrypt rounds=12 |
+| File Storage | Local `./uploads` (dev) → MinIO (prod) |
+| File URLs | Pre-signed, time-limited (15 min expiry) — never permanent public URLs |
+| Cache | Redis Phase 2+ |
+| AI | OpenAI free tier → Ollama/LLaMA |
+
+---
+
+## Guard Chain
+
+Every protected NestJS route passes through guards in this exact order:
+
+```
+RateLimitGuard → InstituteContextMiddleware → JwtAuthGuard → RolesGuard → FeatureGuard
+```
+
+- `InstituteContextMiddleware` sets `req.instituteId` from the JWT — this is the **only** source of `instituteId`
+- `JwtAuthGuard` verifies signature + compares `session_id` in JWT vs `users.session_id` in DB
+- `RolesGuard` checks `@Roles(Role.Admin)` or `@Roles(Role.Student)` decorator
+- `FeatureGuard` checks `@RequiresFeature(Feature.X)` — returns 403 if feature disabled
+- Public routes bypass the chain via `@Public()` decorator
+
+---
+
+## Response Envelope
+
+All API responses use this shape — no exceptions:
+
+```typescript
+// Success
+{ success: true, data: T }
+{ success: true, data: T, meta: { total: number, page: number, pageSize: number } }
+
+// Error (formatted by global exception filter)
+{ success: false, error: { code: string, message: string } }
+```
+
+NestJS exception → HTTP status mapping:
+```
+NotFoundException      → 404
+ConflictException      → 409
+BadRequestException    → 400
+ForbiddenException     → 403
+UnauthorizedException  → 401
+```
+
+Never throw raw `Error` — always use NestJS exceptions.
+
+---
+
+## Key Code Patterns
+
+```typescript
+// instituteId always comes from req, never from body/params
+async create(instituteId: string, userId: string, dto: CreateXDto) { ... }
+
+// Audit log wrapped in try/catch — a failed audit log must never fail the operation
+try {
+  await this.auditLog.record({ instituteId, userId, action: 'CREATE_X', targetId: record.id, newValues: record });
+} catch {}
+
+// Single-record fetch MUST scope by instituteId (prevents IDOR)
+const record = await this.prisma.x.findFirst({
+  where: { id, instituteId, isDeleted: false }
+});
+if (!record) throw new NotFoundException('X not found');
+```
+
+---
+
+## Agents and Skills
+
+Invoke these before writing code — they prevent rework:
+
+| When | Use |
+|---|---|
+| Planning any feature touching > 1 file | `feature-architect` agent |
+| Adding/modifying Prisma schema | `db-architect` agent |
+| After writing a module | `code-reviewer` agent |
+| Slow endpoint or cron | `performance-optimizer` agent |
+| New auth, upload, or data-access code | `security-reviewer` agent |
+| Scaffolding a new NestJS module | `/create-module` skill |
+| Writing API docs | `/document-endpoint` skill |
+| Creating a migration | `/create-migration` skill |
+| Pre-release checks | `/prepare-release` skill |
+| Security scan | `/security-audit` skill |
+
+---
+
+## Non-Negotiable Architecture Rules
+
+### 1. Layered Architecture
+```
+Frontend (Next.js) → Backend API (NestJS) → Database (Supabase PostgreSQL)
+```
+Frontend must **never** access the database directly. Every operation goes through the NestJS API.
+
+### 2. Multi-Tenancy
+`institute_id` on every table. Every query filters by it. Always injected from JWT by middleware — never from request body.
+
+### 3. Single Active Session
+`users.session_id` overwritten on every login. Every request compares JWT `session_id` vs DB — mismatch = 401 force logout.
+
+### 4. Soft Delete
+Never hard-delete. Always `is_deleted = true` + `deleted_at` + `deleted_by`. All queries filter `is_deleted = false`.
+
+### 5. Audit Logging
+All mutations write to `audit_logs` (append-only, never updated or deleted).
+
+### 6. Feature Toggles
+5 features: `students`, `materials`, `assessments`, `payments`, `ai_generation`. When disabled — data is **hidden, not deleted**. Re-enabling restores all data.
+
+### 7. Timezone
+All timestamps stored UTC. All UI displays in **IST (UTC+5:30)**. Assessment times set in IST by admin.
+
+---
+
+## Resolved Decisions (from brainstorm)
+
+| Question | Decision |
+|---|---|
+| Student credential delivery | Admin creates student → system generates temp password → admin shares manually → student forced to change on first login |
+| Bulk upload credentials | One-time downloadable CSV of email + temp passwords after upload |
+| Forgot password | Email reset link, expires 30 minutes, invalidates all sessions |
+| Email verification | Required on admin signup before dashboard access. Token expires 24h. Admin can resend from login page |
+| Admin change email | Not allowed in V1 |
+| Email service | Nodemailer + Gmail SMTP |
+| Can students send notifications? | No — students receive only. No student-to-admin messaging in V1 |
+| Payments — is there a gateway? | No. Manual tracking only. Status: pending / paid / overdue |
+| Fee amount | Set per student at creation. Same every month until admin changes it. Change applies from next month — past months unaffected |
+| Overdue status | Auto-set by daily `@Cron` job — pending payments become overdue 5 days after the month ends (e.g. Jan → overdue Feb 6). Admin can manually override in either direction. Cron ONLY touches `pending` records — never `paid` or `overdue`. Overdue is sticky: stays overdue until admin explicitly marks it paid. System never auto-marks anything as paid |
+| MCQ options | Always 4 options (A/B/C/D), always single correct answer |
+| Max questions per assessment | 100 |
+| Duplicate assessment | Copies questions + settings only — start/end time NOT copied |
+| Edit active assessment | Allowed with warning shown to admin |
+| Assessment instructions | Optional field, shown on card and before exam opens |
+| Deleted student payments | Pending/overdue records stay visible. All-paid records are hidden |
+| Fee currency | ₹ INR throughout UI |
+| Payment export filters | Filterable by month, class, status before download |
+| Payment class filter | Yes — payment grid has class filter |
+| Payment reminder template | Auto-populated with student name, month, amount due. Admin can edit before sending |
+| Notification structure | Title (100 chars) + message body (500 chars) |
+| Notifications scheduling | No — send immediately only in V1 |
+| Student dismiss notification | Yes — badge count decreases when dismissed |
+| Finalise with empty marks | Warning shown listing unanswered questions — admin can dismiss and proceed |
+| Quick Mode + detailed mode | Detailed mode shows blank per-question fields with note explaining total was entered via Quick Mode |
+| Flag for review | Saved permanently until admin removes |
+| Assessment average | Used in stats (not "class average") |
+| Material edit | Admin can replace PDF file + update metadata |
+| Students search materials | No — filter and sort only. Admin can search |
+| Profile photo path | `/{institute_id}/profiles/{student_id}.{ext}` |
+| Student dashboard cards | Upcoming assessments, unread notifications, last 5 recent materials |
+| Admin dashboard | 4 stat cards only — no activity feed in V1 |
+| Student grid mobile | Shows Name + Class only, rest accessible via modal |
+| Batch field | Removed — does not exist in this system |
+| Student export | Full Excel export of all students (all fields) |
+| Student grid filters | Dropdown filters for class and school, separate from search bar |
+| Admin sees student photo | No — profile photos are for student's own profile only |
+| Materials MinIO path | `/{institute_id}/materials/{material_id}.pdf` |
+| Publish requires time | Yes — both start_at and end_at required before publishing |
+| Locked assessment click | Card is unclickable (cursor: not-allowed) |
+| Exam start screen | Instructions screen with Start Exam button — questions shown only after clicking Start |
+| MCQ labels | A, B, C, D |
+| Change answers mid-exam | Yes — student can freely navigate and change any answer before submitting |
+| Bulk fee change by class | Yes — admin can update fee for all students in a class at once. Applies from next month |
+| Payment grid columns | Student Name, Class, Month, Amount (₹), Status |
+| Overdue tab | Dedicated Overdue tab shows all overdue records across all months |
+| Payment reminder target | Admin chooses: everyone, specific students, or pending/overdue only |
+| Feature disabled mid-session | Next API call → 403 → "Feature not available" toast → redirect to dashboard |
+| Institute name in UI | Shown in sidebar header for all logged-in users |
+| Jan 31 mid-month join | Gets Jan record immediately + Feb record on Feb 1 (2 records in 2 days — expected) |
+| Assessment submission modes | Both modes always available on every assessment: (1) Online — type MCQ selections + descriptive text; (2) Upload — upload handwritten answer sheet (JPG/PNG/PDF, 20MB total). Student can use both simultaneously |
+| Assessment auto-submit | Yes — auto-submits at `end_at` if student hasn't submitted |
+| Assessment auto-save | Yes — every 60 seconds during active exam |
+| MCQ evaluation | Typed MCQ → auto-evaluated, read-only in evaluation UI. Uploaded MCQ → admin clicks ✓/✗ toggle per question, system calculates marks. Admin never types MCQ marks manually |
+| Evaluation layout | Left panel: question list with marks input / ✓✗ toggle / comment per question + live running total + Finalise button. Right panel: submission viewer (typed text or image/PDF inline). Same layout for all submission types |
+| Negative marking | Admin decides per assessment. If enabled, admin sets deduction value per wrong MCQ. Unattempted always = 0. Total capped at 0 — never goes negative |
+| Unattempted questions | Shows "Not attempted" in evaluation view. Marks field empty — admin enters 0 manually if needed |
+| Absent students | Never submitted = Absent badge in evaluation list. Marks auto-set to 0. No evaluation action needed |
+| Results release | Admin can release per individual student OR release all at once. Marks always editable after release — no lock. Students see updated marks immediately |
+| Results visibility | Students see per-question marks breakdown + admin feedback per answer, after results released |
+| Admin evaluation UI | Student-by-student navigation. Typed answers + uploaded files inline side by side. Mixed submissions: both visible, admin enters one set of marks. Upload-only: admin chooses per-question marks or single total. Progress bar + per-student badge. Marks auto-save as typed + Finalise button at end |
+| Quick entry mode | Table view for rapid total marks entry per student — for upload-only or simple assessments. Can be mixed with detailed mode |
+| Assessment stats | After finalising: highest, lowest, average, evaluated count, absent count. Auto-updates if marks edited |
+| Flag for review | Admin can flag individual answers during evaluation. Internal only — students never see flags |
+| Student performance history | Per-student view of all assessment marks across time. Read-only. Accessible from student profile |
+| Can admin mix AI + manual questions? | Yes |
+| AI generation failure fallback | Show error, allow manual entry |
+| Feature disable behaviour | Data hidden, not deleted. Re-enable restores everything |
+| Multiple admins per institute | Phase 1: single admin only. Phase 5: multiple with hierarchy |
+| Mid-session hide (materials) | Current session unaffected. Hidden on next open |
+| PDF in-document search | Text-based PDFs only (PDF.js). Scanned PDFs cannot be searched — communicated to users |
+| Watermark | Student's own name overlaid via CSS/canvas in viewer |
+| File types — materials | PDF only, max 50MB, MIME type validated |
+| File types — answer images | JPG/PNG only, max 10MB each, max 3 per question |
+| Profile photo | JPG/PNG, max 5MB |
+| Pagination page size | 20 items per page (fixed) |
+| Default sort — students | Join date descending |
+| Search fields — students | Name, email, phone, roll number, class, school (real-time) |
+| Student grid columns | Name, Email, Phone, Class, School, Parent Name, Parent Phone, Joined Date + credential status indicator |
+| Soft delete — students | Soft-deleted (isDeleted = true) — NOT hard-deleted. But reinstate is not supported in V1 — once deleted the admin cannot undo it through the UI. Active sessions invalidated immediately on delete |
+| Dashboard stats caching | Phase 1: fresh on load. Phase 2: Redis 5-min TTL |
+| Upcoming assessments | All published or active assessments (no date range filter) |
+| Pending payments card | Shows both count of students with pending/overdue AND total amount |
+| Payment records | Auto-generated monthly (1st of month) for all active students. New student joining mid-month gets full month charge |
+| Payment export | Bulk Excel export of all payment records. No individual PDF receipts |
+| Notification types | General / Payment reminder / Assessment reminder — in-app only, no email/SMS in V1 |
+| Notification bell | In the header for both admin and student |
+| Notifications expiry | Never expire — stay until admin deletes. Admin delete removes from all students immediately |
+| Student dismiss notifications | Yes — students can dismiss from their own list only |
+| Notification max length | 500 characters |
+| Assessment visibility | All students in the institute — no class filtering |
+| Materials visibility | All students in the institute — no class filtering |
+| Materials search/filter | Admin and students can filter by subject, sort by date, search by name/subject/author (real-time) |
+| Edit published assessment | Yes — admin can edit at any status |
+| Delete assessment | Yes — soft delete at any status. Submissions also hidden |
+| Duplicate assessment | Yes — creates new draft with same questions and settings |
+| Publish 0 questions | Blocked — must have at least 1 question |
+| Assessment instructions | Optional field shown to students on card and before starting |
+| Exam timer | No countdown. Student sees start datetime and end datetime (IST) on card only |
+| Empty submission | Auto-submit at end_at creates a submission record even if student answered nothing |
+| Student dashboard | Yes — summary cards: upcoming assessments, unread notifications, recent materials |
+| Student can update email | No — email is managed by admin only |
+| Loading states | Skeleton loaders for all data-fetching operations |
+| Confirmation dialogs | Required for all destructive actions (delete student, material, assessment, notification) |
+| Toast notifications | All create/update/delete/error actions show toast |
+| Mobile evaluation layout | Panels stack vertically — viewer on top, marks panel below |
+| CORS | Frontend domain only |
+| MinIO URLs | Pre-signed, 15-minute expiry |
+| Mobile responsiveness | Fully responsive — all modules |
+| Empty states | Every module has empty state with message + CTA |
+
+---
+
+## File Upload Rules
+
+| Upload type | Allowed formats | Max size | Validation |
+|---|---|---|---|
+| Study materials | PDF only | 50MB | MIME type + extension both checked |
+| Answer sheet upload | JPG, PNG, PDF | 20MB total per submission | MIME type + extension |
+| Profile photo | JPG, PNG | 5MB | MIME type + extension |
+| Bulk student upload | .xlsx only | — | Column names + MIME type |
+
+---
+
+## Assessment Status Machine
+
+```
+draft → published (manual by admin)
+     → active     (auto at start_at)
+     → closed     (auto at end_at — auto-submits open exams)
+     → evaluated  (manual by admin after marking)
+```
+`results_released` boolean on assessments controls student visibility of marks.
+
+---
+
+## Student Account Flow
+
+1. Admin creates student (form or bulk Excel)
+2. System generates temporary password
+3. Admin sees/shares credentials (shown once, not stored in plaintext)
+4. Bulk upload: admin downloads one-time CSV of credentials
+5. Student logs in → forced password change on first login
+
+---
+
+## Excel Bulk Upload Columns
+
+Required: `Name`, `Email`, `Phone`, `Class`, `School`, `Fee Amount`
+Optional: `Roll Number`, `Date of Birth`, `Address`, `Parent Name`, `Parent Phone`, `Joined Date`
+Optional columns can be blank. Missing/renamed required columns → entire file rejected.
+Duplicate emails → row skipped, reported to admin in summary.
+System provides a downloadable sample Excel template with headers + one example row.
+
+## Add Student Form Fields
+
+Required: name, email, phone, class, school, fee amount (₹)
+Optional: roll number, date of birth, address, parent name, parent phone, joined date
+Password is auto-generated by the system — admin does not set it manually.
+Admin cannot reset student passwords directly — students use forgot password flow.
+Admin cannot edit student email after creation.
+Fee amount managed from Payments module after creation.
+
+---
+
+## Environment Variables
+
+```
+DATABASE_URL          JWT_SECRET             JWT_REFRESH_SECRET
+STORAGE_TYPE          MINIO_ENDPOINT         MINIO_ACCESS_KEY
+MINIO_SECRET_KEY      MINIO_BUCKET_NAME      OPENAI_API_KEY
+FRONTEND_URL          APP_ENV
+SMTP_HOST             SMTP_PORT              SMTP_USER
+SMTP_PASS             SMTP_FROM
+```
+Email service: Nodemailer + Gmail SMTP (MVP). Defined in `.env.example`. Never commit actual `.env` files.
+
+---
+
+## Development Phases
+
+| Phase | Scope |
+|---|---|
+| 1 | Auth (login, signup, email verify, forgot password), multi-tenant, Students CRUD + bulk upload, feature toggles, institute/admin settings |
+| 2 | Study materials + secure viewer, basic assessments |
+| 3 | AI assessment generation, payments |
+| 4 | Notifications, attendance |
+| 5 | Role hierarchy, super admin, teacher role, multiple admins |
+
+---
+
+## UI Rules
+
+- Card layout: Study Materials and Assessments always use cards — no exceptions
+- All times displayed in IST
+- Every module has an empty state
+- Fully mobile responsive
+- Colors: soft blue (primary) · light grey (bg) · white (cards) · soft dark navy (text)
+- Font: Inter or Poppins
