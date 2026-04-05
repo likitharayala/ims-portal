@@ -4,6 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useRef, useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/lib/auth-store';
 import { api } from '@/lib/api';
 import { useAdminFeatures } from '@/hooks/use-features';
@@ -30,12 +31,14 @@ export function AdminSidebar({ onClose }: Props) {
   const router = useRouter();
   const { user, clearAuth } = useAuthStore();
   const { data: features } = useAdminFeatures();
+  const queryClient = useQueryClient();
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
 
   const handleLogout = async () => {
     try { await api.post('/auth/logout'); } catch {}
     clearAuth();
+    queryClient.clear();
     document.cookie = 'accessToken=; path=/; max-age=0';
     document.cookie = 'userRole=; path=/; max-age=0';
     router.push('/login');

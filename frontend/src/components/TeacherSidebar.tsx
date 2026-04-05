@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/lib/auth-store';
 import { api } from '@/lib/api';
 
@@ -19,10 +20,12 @@ export function TeacherSidebar({ onClose }: Props) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, clearAuth } = useAuthStore();
+  const queryClient = useQueryClient();
 
   const handleLogout = async () => {
     try { await api.post('/auth/logout'); } catch {}
     clearAuth();
+    queryClient.clear();
     document.cookie = 'accessToken=; path=/; max-age=0';
     document.cookie = 'userRole=; path=/; max-age=0';
     router.push('/login');

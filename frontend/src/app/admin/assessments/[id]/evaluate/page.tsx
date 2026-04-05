@@ -220,7 +220,14 @@ export default function EvaluateAssessmentPage() {
                 return (
                   <tr key={s.id} className="hover:bg-slate-50">
                     <td className="px-4 py-3">
-                      <p className="font-medium text-slate-800">{s.studentName}</p>
+                      <p className="font-medium text-slate-800">
+                        {s.studentName}
+                        {s.studentIsDeleted && (
+                          <span className="ml-1.5 text-xs bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-normal">
+                            deleted
+                          </span>
+                        )}
+                      </p>
                       <p className="text-xs text-slate-400">{s.studentEmail}</p>
                     </td>
                     <td className="px-4 py-3 text-slate-600 hidden sm:table-cell">
@@ -242,7 +249,9 @@ export default function EvaluateAssessmentPage() {
                         : '—'}
                     </td>
                     <td className="px-4 py-3 text-center hidden md:table-cell">
-                      {et ? (
+                      {s.studentIsDeleted ? (
+                        <span className="text-xs text-slate-300">—</span>
+                      ) : et ? (
                         <button
                           onClick={() => openExtraTimeModal(s)}
                           className="inline-flex items-center gap-1 text-xs text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full hover:bg-amber-100"
