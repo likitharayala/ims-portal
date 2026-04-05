@@ -457,6 +457,13 @@ Example: January payment → overdue on February 6th if still pending.
 The transition is written to audit_logs.
 Admin can still manually change overdue → paid or overdue → pending at any time.
 
+Critical rules for the cron job:
+The cron job ONLY transitions pending → overdue. It never touches paid or overdue records.
+A payment that is already overdue stays overdue indefinitely — there is no auto-reset or auto-forgiveness.
+If a student has not paid for 5 or 6 months, all those months remain overdue until the admin explicitly marks each one as paid.
+The system will never automatically mark any payment as paid. Only the admin can do that.
+Overdue is a sticky status — it will not change on its own once set.
+
 Edit payment status:
 Admin can change status between pending, paid, overdue.
 Admin can add optional notes when updating status.
