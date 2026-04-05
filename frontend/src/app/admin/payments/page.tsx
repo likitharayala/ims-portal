@@ -53,14 +53,7 @@ function PaymentTable({
           {payments.map((p) => (
             <tr key={p.id} className="hover:bg-slate-50">
               <td className="px-4 py-3">
-                <p className="font-medium text-slate-800">
-                  {p.student.user.name}
-                  {p.student.isDeleted && (
-                    <span className="ml-1.5 text-xs bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-normal">
-                      deleted
-                    </span>
-                  )}
-                </p>
+                <p className="font-medium text-slate-800">{p.student.user.name}</p>
               </td>
               <td className="px-4 py-3 text-slate-600 hidden sm:table-cell">{p.student.class}</td>
               <td className="px-4 py-3 text-slate-600">
@@ -121,9 +114,11 @@ export default function AdminPaymentsPage() {
     page: overduePage,
   });
 
-  const allPayments = allData?.data ?? [];
+  const allPayments = (allData?.data ?? []).filter((payment) => !payment.student.isDeleted);
   const allMeta = allData?.meta;
-  const overduePayments = overdueData?.data ?? [];
+  const overduePayments = (overdueData?.data ?? []).filter(
+    (payment) => !payment.student.isDeleted,
+  );
   const overdueMeta = overdueData?.meta;
 
   const handleExport = async () => {
