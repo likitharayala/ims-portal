@@ -90,10 +90,35 @@ All timestamps stored UTC. All UI displays in **IST (UTC+5:30)**. Assessment tim
 | Profile photo | JPG/PNG, max 5MB |
 | Pagination page size | 20 items per page (fixed) |
 | Default sort — students | Join date descending |
-| Search fields — students | Name, email, phone, roll number |
+| Search fields — students | Name, email, phone, roll number, class, school (real-time) |
+| Student grid columns | Name, Email, Phone, Class, School, Parent Name, Parent Phone, Joined Date + credential status indicator |
+| Soft delete — students | Permanent — cannot be restored. Active sessions invalidated immediately on delete |
 | Dashboard stats caching | Phase 1: fresh on load. Phase 2: Redis 5-min TTL |
+| Upcoming assessments | All published or active assessments (no date range filter) |
+| Pending payments card | Shows both count of students with pending/overdue AND total amount |
+| Payment records | Auto-generated monthly (1st of month) for all active students. New student joining mid-month gets full month charge |
+| Payment export | Bulk Excel export of all payment records. No individual PDF receipts |
 | Notification types | General / Payment reminder / Assessment reminder — in-app only, no email/SMS in V1 |
-| Notifications expiry | Never expire — stay until admin deletes |
+| Notification bell | In the header for both admin and student |
+| Notifications expiry | Never expire — stay until admin deletes. Admin delete removes from all students immediately |
+| Student dismiss notifications | Yes — students can dismiss from their own list only |
+| Notification max length | 500 characters |
+| Assessment visibility | All students in the institute — no batch/class filtering |
+| Materials visibility | All students in the institute — no batch/class filtering |
+| Materials search/filter | Admin and students can filter by subject, sort by date, search by name/subject/author (real-time) |
+| Edit published assessment | Yes — admin can edit at any status |
+| Delete assessment | Yes — soft delete at any status. Submissions also hidden |
+| Duplicate assessment | Yes — creates new draft with same questions and settings |
+| Publish 0 questions | Blocked — must have at least 1 question |
+| Assessment instructions | Optional field shown to students on card and before starting |
+| Exam timer | No countdown. Student sees start datetime and end datetime (IST) on card only |
+| Empty submission | Auto-submit at end_at creates a submission record even if student answered nothing |
+| Student dashboard | Yes — summary cards: upcoming assessments, unread notifications, recent materials |
+| Student can update email | No — email is managed by admin only |
+| Loading states | Skeleton loaders for all data-fetching operations |
+| Confirmation dialogs | Required for all destructive actions (delete student, material, assessment, notification) |
+| Toast notifications | All create/update/delete/error actions show toast |
+| Mobile evaluation layout | Panels stack vertically — viewer on top, marks panel below |
 | CORS | Frontend domain only |
 | MinIO URLs | Pre-signed, 15-minute expiry |
 | Mobile responsiveness | Fully responsive — all modules |
