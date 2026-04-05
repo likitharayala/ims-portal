@@ -4,13 +4,10 @@ import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  const configuredOrigins = (process.env.FRONTEND_URL ?? '')
-    .split(',')
-    .map((origin) => origin.trim().replace(/\/$/, ''))
-    .filter(Boolean);
-  const shouldFallbackToDynamicOrigin =
-    configuredOrigins.length === 0 ||
-    configuredOrigins.every((origin) => origin.includes('localhost'));
+  const allowedOrigins = [
+    process.env.FRONTEND_URL,
+    'http://localhost:3000',
+  ].filter((origin): origin is string => Boolean(origin));
 
   // Global validation pipe
   app.useGlobalPipes(
@@ -23,24 +20,7 @@ async function bootstrap() {
 
   // CORS — frontend domain only
   app.enableCors({
-    origin: (origin, callback) => {
-      if (!origin) {
-        callback(null, true);
-        return;
-      }
-
-      const normalizedOrigin = origin.replace(/\/$/, '');
-
-      if (
-        configuredOrigins.includes(normalizedOrigin) ||
-        shouldFallbackToDynamicOrigin
-      ) {
-        callback(null, true);
-        return;
-      }
-
-      callback(new Error(`Origin ${origin} not allowed by CORS`), false);
-    },
+    origin: allowedOrigins,
     credentials: true,
   });
 
