@@ -31,6 +31,21 @@
 $ npm install
 ```
 
+## Email Setup
+
+Required environment variables:
+
+- `EMAIL_PROVIDER`
+- `RESEND_API_KEY`
+
+Current supported provider:
+
+- `EMAIL_PROVIDER=resend`
+
+When `EMAIL_PROVIDER=resend`, the backend uses Resend as the email transport and requires a valid `RESEND_API_KEY`.
+
+The `EMAIL_PROVIDER` value controls which email transport `EmailService` uses. This keeps provider selection in configuration so future providers can be added without changing signup or provisioning business logic.
+
 ## Compile and run the project
 
 ```bash

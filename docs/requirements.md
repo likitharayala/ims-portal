@@ -1,15 +1,39 @@
 # Requirements
 
-## Email Provider
+## Email Delivery Provider Configuration
 
-The backend email transport now uses Resend instead of SMTP/Nodemailer.
+### Previous
 
-Current provider details:
+Email delivery used SMTP via Nodemailer.
+
+### Current
+
+Email delivery now uses the Resend API provider.
+
+### Configuration
+
+Email transport is now selected through configuration:
+
+- `EMAIL_PROVIDER`
+- `RESEND_API_KEY`
+
+Current production value:
+
+- `EMAIL_PROVIDER=resend`
+
+When `EMAIL_PROVIDER=resend`, the backend uses:
+
 - package: `resend`
 - auth: `RESEND_API_KEY`
 - sender: `Teachly <onboarding@resend.dev>`
 
-This change only affects the transport layer inside `EmailService`.
+### Why
+
+This keeps email provider selection config-driven instead of hardcoding business flow changes into signup or provisioning logic.
+
+### Design Decision
+
+Email provider selection now belongs to the transport layer inside `EmailService`.
 
 This does **not** change:
 - signup flow
@@ -17,6 +41,10 @@ This does **not** change:
 - retry behavior
 - auth flow
 - JWT behavior
+
+### Future Extension
+
+SMTP or SendGrid support can be added later behind `EMAIL_PROVIDER` without changing signup flow, provisioning flow, or background retry logic.
 
 ## Admin Signup Flow (Phase 1)
 

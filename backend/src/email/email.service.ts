@@ -6,8 +6,10 @@ import { Resend } from 'resend';
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
   private readonly resend: Resend;
+  private readonly provider: string;
 
   constructor(private readonly config: ConfigService) {
+    this.provider = this.config.get<string>('EMAIL_PROVIDER') ?? 'resend';
     this.resend = new Resend(this.config.get<string>('RESEND_API_KEY'));
   }
 
@@ -74,6 +76,10 @@ export class EmailService {
 
   private async send(options: { to: string; subject: string; html: string }): Promise<void> {
     try {
+      if (this.provider !== 'resend') {
+        throw new Error(`Unsupported email provider: ${this.provider}`);
+      }
+
       const { error } = await this.resend.emails.send({
         from: 'Teachly <onboarding@resend.dev>',
         to: options.to,
