@@ -20,38 +20,10 @@ async function bootstrap() {
   );
 
   // CORS — frontend domain only
+  // Temporary debugging fix: allow all origins to verify whether CORS is causing login failures.
   app.enableCors({
-    origin: (origin, callback) => {
-      if (!origin) {
-        callback(null, true);
-        return;
-      }
-
-      const normalizedOrigin = origin.replace(/\/$/, '');
-      const isAllowedOrigin = allowedOrigins.some(
-        (allowedOrigin) => allowedOrigin.replace(/\/$/, '') === normalizedOrigin,
-      );
-
-      let isVercelPreview = false;
-      try {
-        const parsedOrigin = new URL(origin);
-        isVercelPreview =
-          parsedOrigin.protocol === 'https:' &&
-          parsedOrigin.hostname.endsWith('.vercel.app');
-      } catch {
-        isVercelPreview = false;
-      }
-
-      if (isAllowedOrigin || isVercelPreview) {
-        callback(null, true);
-        return;
-      }
-
-      callback(new Error('Not allowed by CORS'));
-    },
+    origin: true,
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
   });
 
   // Global prefix
