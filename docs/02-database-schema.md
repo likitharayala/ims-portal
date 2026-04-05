@@ -118,10 +118,17 @@ All authenticated users — admins and students share this table, differentiated
 | institute_id | UUID | NOT NULL, FK → institutes.id | Tenant reference |
 | role_id | SMALLINT | NOT NULL, FK → roles.id | 1=admin, 2=student |
 | name | VARCHAR(255) | NOT NULL | Full name |
-| email | VARCHAR(255) | NOT NULL | Login email |
+| email | VARCHAR(255) | NOT NULL, UNIQUE | Login email — globally unique across all institutes |
 | phone | VARCHAR(20) | | Login phone (alternative identifier) |
 | password_hash | VARCHAR(255) | NOT NULL | bcrypt hash (rounds=12) |
 | session_id | UUID | | Current active session — single-session enforcement |
+| refresh_token_hash | VARCHAR(255) | | Hash of current refresh token |
+| is_email_verified | BOOLEAN | NOT NULL, DEFAULT false | Admin only — must verify before dashboard access |
+| email_verification_token | VARCHAR(255) | | Hashed token for email verification link |
+| email_verification_expires_at | TIMESTAMPTZ | | Token expiry (24h from issue) |
+| password_reset_token | VARCHAR(255) | | Hashed token for password reset link |
+| password_reset_expires_at | TIMESTAMPTZ | | Token expiry (30min from issue) |
+| must_change_password | BOOLEAN | NOT NULL, DEFAULT false | true for new students — forced change on first login |
 | is_active | BOOLEAN | NOT NULL, DEFAULT true | Account enabled |
 | last_login_at | TIMESTAMPTZ | | Last successful login timestamp |
 | is_deleted | BOOLEAN | NOT NULL, DEFAULT false | Soft delete flag |
@@ -132,20 +139,20 @@ All authenticated users — admins and students share this table, differentiated
 
 **Constraints:**
 ```sql
-UNIQUE (institute_id, email)   -- email unique per institute, not globally
+UNIQUE (email)                 -- email globally unique across all institutes and all roles
 UNIQUE (institute_id, phone)   -- phone unique per institute
 ```
 
 **Indexes:**
 ```sql
-CREATE INDEX idx_users_institute  ON users(institute_id, is_deleted);
-CREATE INDEX idx_users_email      ON users(institute_id, email)   WHERE is_deleted = false;
-CREATE INDEX idx_users_phone      ON users(institute_id, phone)   WHERE is_deleted = false;
-CREATE INDEX idx_users_role       ON users(institute_id, role_id) WHERE is_deleted = false;
-CREATE INDEX idx_users_created_at ON users(institute_id, created_at DESC);
+CREATE UNIQUE INDEX idx_users_email     ON users(email);
+CREATE INDEX idx_users_institute        ON users(institute_id, is_deleted);
+CREATE INDEX idx_users_phone            ON users(institute_id, phone)   WHERE is_deleted = false;
+CREATE INDEX idx_users_role             ON users(institute_id, role_id) WHERE is_deleted = false;
+CREATE INDEX idx_users_created_at       ON users(institute_id, created_at DESC);
 ```
 
-**Notes:** `session_id` is overwritten on every login, immediately invalidating all other active sessions.
+**Notes:** `session_id` is overwritten on every login, immediately invalidating all other active sessions. Admin email cannot be changed after signup in V1.
 
 ---
 
@@ -159,13 +166,15 @@ Extended profile for student users. One-to-one with `users` where `role_id = 2`.
 | institute_id | UUID | NOT NULL, FK → institutes.id | Tenant reference |
 | user_id | UUID | NOT NULL, UNIQUE, FK → users.id | Linked auth account |
 | roll_number | VARCHAR(50) | | Institute-assigned roll number |
+| class | VARCHAR(100) | NOT NULL | Class or grade e.g. "Grade 10", "Class 12A" |
+| school | VARCHAR(255) | NOT NULL | School or institution the student attends |
+| fee_amount | NUMERIC(10,2) | NOT NULL | Monthly fee in ₹ — set at creation, stays until admin changes |
 | date_of_birth | DATE | | |
 | address | TEXT | | |
 | parent_name | VARCHAR(255) | | |
 | parent_phone | VARCHAR(20) | | |
-| batch | VARCHAR(100) | | Class or batch name |
 | join_date | DATE | NOT NULL, DEFAULT CURRENT_DATE | |
-| profile_image_url | TEXT | | MinIO path |
+| profile_image_url | TEXT | | MinIO path: /{institute_id}/profiles/{student_id}.{ext} |
 | is_deleted | BOOLEAN | NOT NULL, DEFAULT false | |
 | deleted_at | TIMESTAMPTZ | | |
 | deleted_by | UUID | FK → users.id | |
@@ -181,10 +190,11 @@ UNIQUE (institute_id, roll_number) WHERE roll_number IS NOT NULL AND is_deleted 
 ```sql
 CREATE INDEX idx_students_institute  ON students(institute_id, is_deleted);
 CREATE INDEX idx_students_user_id    ON students(user_id);
-CREATE INDEX idx_students_batch      ON students(institute_id, batch)    WHERE is_deleted = false;
+CREATE INDEX idx_students_class      ON students(institute_id, class)    WHERE is_deleted = false;
+CREATE INDEX idx_students_school     ON students(institute_id, school)   WHERE is_deleted = false;
 CREATE INDEX idx_students_created_at ON students(institute_id, created_at DESC);
 
--- Full-text search index for the student search bar (name + email + phone)
+-- Full-text search index for the student search bar (name + email + phone + class + school)
 CREATE INDEX idx_students_search ON users
   USING GIN (
     to_tsvector('english',
@@ -212,7 +222,7 @@ Each row is one material card. Supports the secure document viewer with in-docum
 | description | TEXT | | Optional short description |
 | file_url | TEXT | NOT NULL | MinIO path: /{institute_id}/materials/{uuid}.pdf |
 | file_name | VARCHAR(255) | NOT NULL | Original filename |
-| file_type | VARCHAR(20) | NOT NULL | pdf, docx, etc. |
+| file_type | VARCHAR(20) | NOT NULL | Always 'pdf' — only PDF uploads allowed |
 | file_size_bytes | BIGINT | | File size for display |
 | is_hidden | BOOLEAN | NOT NULL, DEFAULT false | Admin hid from students (not deleted) |
 | uploaded_by | UUID | NOT NULL, FK → users.id | Admin who uploaded |
@@ -265,6 +275,9 @@ Each row is one assessment card. Supports MCQ, Descriptive, or Mixed types.
 | status | VARCHAR(20) | NOT NULL, DEFAULT 'draft' | draft → published → active → closed → evaluated |
 | ai_generated | BOOLEAN | NOT NULL, DEFAULT false | Questions were AI-generated |
 | instructions | TEXT | | Instructions shown to student before starting |
+| negative_marking_enabled | BOOLEAN | NOT NULL, DEFAULT false | Whether wrong MCQ answers deduct marks |
+| negative_marking_value | NUMERIC(5,2) | NOT NULL, DEFAULT 0 | Marks deducted per wrong MCQ answer |
+| results_released | BOOLEAN | NOT NULL, DEFAULT false | When true, students can see their marks |
 | created_by | UUID | NOT NULL, FK → users.id | Admin who created |
 | is_deleted | BOOLEAN | NOT NULL, DEFAULT false | |
 | deleted_at | TIMESTAMPTZ | | |
@@ -295,8 +308,8 @@ Individual questions belonging to an assessment.
 | type | VARCHAR(20) | NOT NULL | mcq / descriptive |
 | marks | INTEGER | NOT NULL, CHECK (marks > 0) | Marks allocated |
 | difficulty | VARCHAR(10) | NOT NULL | easy / medium / hard |
-| options | JSONB | | MCQ only: [{label: "A", text: "...", is_correct: false}, ...] |
-| correct_option | VARCHAR(5) | | MCQ only: correct label e.g. "A" |
+| options | JSONB | | MCQ only: exactly 4 options — [{label: "A", text: "...", is_correct: false}, {label: "B",...}, {label: "C",...}, {label: "D",...}] |
+| correct_option | VARCHAR(5) | | MCQ only: correct label e.g. "A". Always exactly one correct answer. |
 | order_index | SMALLINT | NOT NULL, DEFAULT 0 | Display order within assessment |
 | image_url | TEXT | | Optional question image in MinIO |
 | created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
@@ -320,12 +333,16 @@ One row per student per assessment. Tracks the full answer set and evaluation.
 | institute_id | UUID | NOT NULL, FK → institutes.id | Tenant reference |
 | assessment_id | UUID | NOT NULL, FK → assessments.id | Assessment reference |
 | student_id | UUID | NOT NULL, FK → students.id | Student reference |
-| answers | JSONB | NOT NULL, DEFAULT '[]' | [{question_id, type, selected_option, answer_text, image_url, marks_awarded, is_correct}] |
-| total_marks_awarded | INTEGER | | Calculated after evaluation |
+| answers | JSONB | NOT NULL, DEFAULT '[]' | Typed answers: [{question_id, type, selected_option, answer_text, marks_awarded, is_correct, feedback, flag_for_review}] |
+| upload_files | JSONB | NOT NULL, DEFAULT '[]' | Written answer sheet uploads: [{url, file_name, file_type, size_bytes}] — JPG/PNG/PDF, max 20MB total |
+| total_marks_awarded | NUMERIC(10,2) | | Calculated after evaluation — capped at 0, never negative |
+| is_absent | BOOLEAN | NOT NULL, DEFAULT false | true if student never opened or submitted the assessment |
+| flag_for_review | BOOLEAN | NOT NULL, DEFAULT false | Admin-only flag for submissions needing re-check |
+| results_released_at | TIMESTAMPTZ | | When admin released results for this specific student |
 | evaluated_by | UUID | FK → users.id | Admin evaluator |
 | evaluated_at | TIMESTAMPTZ | | When evaluation was completed |
 | status | VARCHAR(20) | NOT NULL, DEFAULT 'pending' | pending / submitted / evaluated |
-| submitted_at | TIMESTAMPTZ | | When student hit submit |
+| submitted_at | TIMESTAMPTZ | | When student hit submit (or auto-submit at end_at) |
 | created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
 | updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
 
@@ -356,7 +373,7 @@ Monthly fee record per student. The modal shows last 10 months.
 | institute_id | UUID | NOT NULL, FK → institutes.id | Tenant reference |
 | student_id | UUID | NOT NULL, FK → students.id | Student reference |
 | month | DATE | NOT NULL | First day of the month e.g. 2025-03-01 |
-| amount | NUMERIC(10,2) | NOT NULL | Fee amount |
+| amount | NUMERIC(10,2) | NOT NULL | Fee amount at time of record creation (snapshot of student fee_amount) |
 | status | VARCHAR(20) | NOT NULL, DEFAULT 'pending' | pending / paid / overdue |
 | paid_at | TIMESTAMPTZ | | When marked as paid |
 | updated_by | UUID | FK → users.id | Admin who last edited status |
@@ -381,8 +398,22 @@ CREATE INDEX idx_payments_status    ON payments(institute_id, status)   WHERE is
 CREATE INDEX idx_payments_month     ON payments(institute_id, month DESC);
 
 -- Dashboard stat: count pending payments
-CREATE INDEX idx_payments_pending   ON payments(institute_id, status) WHERE status = 'pending' AND is_deleted = false;
+CREATE INDEX idx_payments_pending   ON payments(institute_id, status) WHERE status = 'pending'  AND is_deleted = false;
+
+-- Overdue tab: all overdue records across all months
+CREATE INDEX idx_payments_overdue   ON payments(institute_id, month DESC) WHERE status = 'overdue' AND is_deleted = false;
+
+-- Auto-overdue cron: find pending records past grace period
+CREATE INDEX idx_payments_pending_month ON payments(institute_id, month) WHERE status = 'pending' AND is_deleted = false;
 ```
+
+**Payment auto-generation (NestJS @Cron):**
+- Monthly cron on 1st of every month: creates `pending` records for all active (non-deleted) students using their current `fee_amount`
+- When new student added: immediate `pending` record created for current month (full month charge regardless of join date)
+- Daily cron: transitions `pending → overdue` for any payment where the month ended more than 5 days ago
+  - Example: January payment → overdue on February 6th if still pending
+  - Cron only touches `pending` records — never modifies `paid` or `overdue`
+  - Overdue is sticky: stays overdue until admin explicitly marks as paid or pending
 
 **Last 10 months query:**
 ```sql
@@ -404,9 +435,10 @@ Notifications created by admin — broadcast or targeted.
 |---|---|---|---|
 | id | UUID | PK, DEFAULT gen_random_uuid() | |
 | institute_id | UUID | NOT NULL, FK → institutes.id | Tenant reference |
-| title | VARCHAR(255) | NOT NULL | Notification heading |
-| body | TEXT | NOT NULL | Full notification content |
-| target | VARCHAR(20) | NOT NULL, DEFAULT 'all' | all / specific |
+| title | VARCHAR(100) | NOT NULL | Notification heading (max 100 characters) |
+| body | VARCHAR(500) | NOT NULL | Full notification content (max 500 characters) |
+| type | VARCHAR(30) | NOT NULL, DEFAULT 'general' | general / payment_reminder / assessment_reminder |
+| target | VARCHAR(20) | NOT NULL, DEFAULT 'all' | all / specific / pending_overdue (payment_reminder only) |
 | sent_by | UUID | NOT NULL, FK → users.id | Admin sender |
 | is_deleted | BOOLEAN | NOT NULL, DEFAULT false | |
 | deleted_at | TIMESTAMPTZ | | |
@@ -433,6 +465,8 @@ Per-student delivery and read tracking. One row per student per notification.
 | student_id | UUID | NOT NULL, FK → students.id | Recipient |
 | is_read | BOOLEAN | NOT NULL, DEFAULT false | Read status for unread badge |
 | read_at | TIMESTAMPTZ | | When student read it |
+| is_dismissed | BOOLEAN | NOT NULL, DEFAULT false | Student dismissed from their own list (does not affect other students) |
+| dismissed_at | TIMESTAMPTZ | | When student dismissed it |
 
 **Constraints:**
 ```sql
@@ -569,7 +603,9 @@ CREATE POLICY audit_insert_only ON audit_logs
 │ institute_id │                                           │
 │ user_id (FK) │                                           │
 │ roll_number  │                                           │
-│ batch        │                                           │
+│ class        │                                           │
+│ school       │                                           │
+│ fee_amount   │                                           │
 │ is_deleted   │                                           │
 └──────┬───────┘                                           │
        │                                                   │
@@ -584,15 +620,17 @@ CREATE POLICY audit_insert_only ON audit_logs
 │ student_id  │  │ assessment_id  │◄──────────────┐       │
 │ month       │  │ student_id(FK)─┼───────────────┼───────┘
 │ amount      │  │ answers (JSONB)│               │
-│ status      │  │ marks_awarded  │      ┌────────▼──────────┐
-│ is_deleted  │  │ status         │      │   assessments     │
-└─────────────┘  └────────────────┘      │───────────────────│
-                                         │ id (PK)           │
-                                         │ institute_id (FK) │
-                                         │ title             │
+│ status      │  │ upload_files   │      ┌────────▼──────────┐
+│ is_deleted  │  │ is_absent      │      │   assessments     │
+└─────────────┘  │ flag_for_review│      │───────────────────│
+                 │ marks_awarded  │      │ id (PK)           │
+                 │ status         │      │ institute_id (FK) │
+                 └────────────────┘      │ title             │
                                          │ subjects (TEXT[]) │
                                          │ type / status     │
                                          │ start_at / end_at │
+                                         │ neg_marking       │
+                                         │ results_released  │
                                          │ is_deleted        │
                                          └────────┬──────────┘
                                                   │ 1:M
@@ -614,7 +652,8 @@ CREATE POLICY audit_insert_only ON audit_logs
 │ id (PK)              │     │ notification_id (FK)     │
 │ institute_id (FK)    │     │ student_id (FK)          │
 │ title / body         │     │ is_read                  │
-│ target (all/specific)│     │ read_at                  │
+│ type                 │     │ read_at                  │
+│ target (all/specific)│     │ is_dismissed             │
 │ sent_by (FK)         │     └──────────────────────────┘
 │ is_deleted           │
 └──────────────────────┘
@@ -670,7 +709,7 @@ VALUES ($current_institute_id, $user_id, ...);
 
 -- UPDATE: always include institute_id to prevent cross-tenant mutation
 UPDATE students
-SET batch = $new_batch
+SET class = $new_class
 WHERE id           = $resource_id
   AND institute_id = $current_institute_id
   AND is_deleted   = false;
@@ -707,8 +746,8 @@ CREATE INDEX idx_<table>_institute ON <table>(institute_id, is_deleted);
 ### Pattern 2 — Partial indexes (exclude deleted rows from index entirely)
 ```sql
 -- Keeps index small and fast — deleted rows never scanned
-CREATE INDEX idx_users_email ON users(institute_id, email) WHERE is_deleted = false;
-CREATE INDEX idx_students_batch ON students(institute_id, batch) WHERE is_deleted = false;
+CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_students_class ON students(institute_id, class) WHERE is_deleted = false;
 CREATE INDEX idx_payments_status ON payments(institute_id, status) WHERE is_deleted = false;
 ```
 
@@ -771,3 +810,13 @@ CREATE INDEX idx_submissions_answers ON submissions USING GIN (answers);
 | `sessions` table separate from `users` | Clean refresh token rotation without modifying user record |
 | GIN index on materials title/subject/author | Powers the student-facing material search feature from requirements |
 | Partial indexes with `WHERE is_deleted = false` | Deleted rows excluded from index — keeps indexes lean as data grows |
+| `students.class` + `students.school` (NOT `batch`) | Batch removed — class and school are required fields; enable dropdown filters in UI |
+| `students.fee_amount` on students table | Monthly fee is per-student; payments table snapshots the amount at record creation time |
+| `submissions.upload_files JSONB` | Dual submission mode — students can type answers AND upload answer sheet files |
+| `submissions.is_absent` | Students who never submitted auto-marked absent; marks default to 0 without admin action |
+| `assessments.results_released` | Controls when students can see their marks — per-assessment flag, admin-controlled |
+| `assessments.negative_marking_*` | Per-assessment negative marking configuration; total marks capped at 0 |
+| `notifications.title VARCHAR(100)` + `body VARCHAR(500)` | Short limits enforced at DB level; in-app only, no email/SMS in V1 |
+| `notification_recipients.is_dismissed` | Student dismiss removes from their view only — other students unaffected |
+| `users.email UNIQUE` globally | Login lookup is global; prevents same email in two institutes |
+| Auth token fields on `users` table | Verification + reset tokens stored hashed; `must_change_password` for new students |

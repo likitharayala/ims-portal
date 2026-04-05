@@ -46,14 +46,19 @@ The system is built on a strict 4-layer model. No layer may bypass the one below
 ║   │   RateLimit → InstituteContext → JwtAuth → Roles → Feature  │    ║
 ║   └───────────────────────────┬────────────────────────────────┘    ║
 ║                               │                                      ║
-║   ┌──────────┬────────────┬───┴─────────┬───────────┬───────────┐   ║
+║   ┌──────────┬────────────┬─────────────┬───────────┬───────────┐   ║
 ║   │   Auth   │  Students  │  Materials  │Assessments│  Payments  │   ║
 ║   │  Module  │  Module    │  Module     │  Module   │  Module    │   ║
 ║   └──────────┴────────────┴─────────────┴───────────┴───────────┘   ║
+║   ┌───────────────────────────────────────────────────────────────┐  ║
+║   │  Notifications Module                                         │  ║
+║   │  Cron Jobs: PaymentAutoGenerate (monthly) │ AutoOverdue(daily)│  ║
+║   └───────────────────────────────────────────────────────────────┘  ║
 ║                                                                      ║
 ║   ┌──────────────────────────────────────────────────────────────┐   ║
 ║   │               Shared Services                                │   ║
 ║   │   AuditLog │ FileUpload │ AI Service │ ExcelTemplate         │   ║
+║   │   EmailService (Nodemailer + Gmail SMTP)                     │   ║
 ║   └──────────────────────────────────────────────────────────────┘   ║
 ╚══════════════════════════════════════════════════════════════════════╝
                                 │
@@ -66,7 +71,7 @@ The system is built on a strict 4-layer model. No layer may bypass the one below
 ║   │              │  │                │  │          │  │         │  ║
 ║   │  Primary DB  │  │ /{inst_id}/    │  │ AI gen   │  │ Cache   │  ║
 ║   │  All data    │  │  /materials/   │  │          │  │ Rate    │  ║
-║   │  Auto backup │  │  /submissions/ │  │          │  │ limit   │  ║
+║   │  Auto backup │  │  /profiles/    │  │          │  │ limit   │  ║
 ║   └──────────────┘  └────────────────┘  └──────────┘  └─────────┘  ║
 ╚══════════════════════════════════════════════════════════════════════╝
 ```
@@ -113,10 +118,10 @@ The system is built on a strict 4-layer model. No layer may bypass the one below
                         │  │   All mutations write to audit_logs      │ │
                         │  └─────────────────────┬───────────────────┘ │
                         └────────────────────────┼─────────────────────┘
-                                  ┌──────────────┼──────────────┐
-                                  ▼              ▼              ▼
-                           Supabase DB        MinIO         OpenAI
-                           (via DATABASE_URL) (files)      (AI gen)
+                                  ┌──────────────┼──────────────┬──────────────┐
+                                  ▼              ▼              ▼              ▼
+                           Supabase DB        MinIO         OpenAI       Gmail SMTP
+                           (via DATABASE_URL) (files)      (AI gen)   (Nodemailer)
 ```
 
 ---
@@ -308,6 +313,12 @@ Admin sees:    API enforces:      Student sees:
 getAssessments() { ... }
 ```
 
+**Mid-session feature disable:**
+If admin disables a feature while a student is actively on that module, the student's **next API call** returns `403 FEATURE_NOT_ENABLED`. The frontend catches this and shows "This feature is not available" then redirects to dashboard. No data is deleted — re-enabling restores everything.
+
+**Institute name in UI:**
+The institute's name (from `institutes.name`) is displayed in the sidebar header for all logged-in users (admin and student). Loaded as part of the `/auth/me` response.
+
 ---
 
 ## 6. Session Validation Flow
@@ -458,6 +469,11 @@ Two environments with distinct infrastructure:
 │  MINIO_ACCESS_KEY=...                                           │
 │  MINIO_SECRET_KEY=...                                           │
 │  OPENAI_API_KEY=...                                             │
+│  SMTP_HOST=smtp.gmail.com                                       │
+│  SMTP_PORT=587                                                  │
+│  SMTP_USER=...                                                  │
+│  SMTP_PASS=...  (Gmail App Password)                            │
+│  SMTP_FROM=...  (display name + email)                          │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -475,8 +491,11 @@ Two environments with distinct infrastructure:
 | RolesGuard | Enforces admin/student route separation |
 | FeatureGuard | Enforces institute-level feature access |
 | AuditLogService | Records all mutations — called from every service write operation |
-| FileUploadService | Handles all MinIO interactions; path format `/{institute_id}/{type}/{file}` |
+| FileUploadService | Handles all MinIO interactions; paths: `/{institute_id}/materials/{id}.pdf`, `/{institute_id}/profiles/{id}.{ext}` |
 | AiService | Wraps OpenAI/Ollama calls for assessment generation |
+| EmailService | Nodemailer + Gmail SMTP — sends verification emails and password reset links |
 | ExcelTemplateService | Generates downloadable template + validates uploaded Excel on bulk student import |
+| NotificationsModule | In-app notifications — admin creates, students receive; unread badge count via `notification_recipients` |
+| PaymentCronService | Two cron jobs: (1) 1st of month — auto-create pending records for all active students; (2) daily — transition pending→overdue after 5-day grace period |
 | Supabase PostgreSQL | Primary data store — all tables, all tenants, accessed only by NestJS |
-| MinIO | File storage — study materials, submission images, profile photos |
+| MinIO | File storage — study materials, student profile photos; pre-signed 15-min URLs |
