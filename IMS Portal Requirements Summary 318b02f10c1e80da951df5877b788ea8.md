@@ -488,10 +488,33 @@ Admin can re-evaluate and update marks before results are released to students.
 Once admin marks results as "released", students can view their marks.
 Add a results_released boolean field to assessments.
 
+Quick total entry mode:
+For upload-only or simple assessments, admin can switch to Quick Mode in the evaluation interface.
+Quick Mode shows all students in a table with a single total marks input per student.
+Admin can enter total marks for all students rapidly without opening each student individually.
+Quick Mode and student-by-student mode can be used together — admin can use Quick Mode for some students and detailed mode for others.
+
+Assessment stats (after finalising):
+After admin finalises evaluation, a stats summary card is shown on the assessment:
+Highest score, lowest score, class average, total students evaluated, total absent.
+Stats update automatically if admin edits marks after finalising.
+
+Flag for review:
+During evaluation, admin can flag a specific student's answer with a "Flag for Review" marker.
+Flagged answers are highlighted in the evaluation list so admin can return to them later.
+Admin can unflag once resolved.
+Flags are internal only — students never see them.
+
 Student result view (after results released):
 Student sees a per-question marks breakdown (e.g. Q1: 8/10, Q2: 5/10).
 Student also sees any feedback/comments admin added per answer during evaluation.
 Student sees their total marks and the assessment total marks.
+
+Student performance history:
+Admin can view a student's marks across all assessments from the student's profile page.
+Shows a list of all assessments the student was part of: assessment name, total marks, marks awarded, date.
+Displayed in reverse chronological order (most recent first).
+This is a read-only view — no editing from this screen.
 
 Student during assessment:
 Locked until start time (status: published — student sees card but cannot open)

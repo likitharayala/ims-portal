@@ -73,6 +73,10 @@ All timestamps stored UTC. All UI displays in **IST (UTC+5:30)**. Assessment tim
 | Results release | Admin can release per individual student OR release all at once. Marks always editable after release — no lock. Students see updated marks immediately |
 | Results visibility | Students see per-question marks breakdown + admin feedback per answer, after results released |
 | Admin evaluation UI | Student-by-student navigation. Typed answers + uploaded files inline side by side. Mixed submissions: both visible, admin enters one set of marks. Upload-only: admin chooses per-question marks or single total. Progress bar + per-student badge. Marks auto-save as typed + Finalise button at end |
+| Quick entry mode | Table view for rapid total marks entry per student — for upload-only or simple assessments. Can be mixed with detailed mode |
+| Assessment stats | After finalising: highest, lowest, average, evaluated count, absent count. Auto-updates if marks edited |
+| Flag for review | Admin can flag individual answers during evaluation. Internal only — students never see flags |
+| Student performance history | Per-student view of all assessment marks across time. Read-only. Accessible from student profile |
 | Can admin mix AI + manual questions? | Yes |
 | AI generation failure fallback | Show error, allow manual entry |
 | Feature disable behaviour | Data hidden, not deleted. Re-enable restores everything |
