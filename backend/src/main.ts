@@ -20,8 +20,10 @@ async function bootstrap() {
 
   // CORS — frontend domain only
   app.enableCors({
-    origin: allowedOrigins,
+    origin: [...allowedOrigins, /\.vercel\.app$/],
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
   });
 
   // Global prefix
