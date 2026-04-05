@@ -1,4 +1,4 @@
-# IMS Portal — File Storage Architecture (Section 5)
+# Teachly — File Storage Architecture (Section 5)
 
 **Hard rule:** The frontend never talks to MinIO directly. Every file upload, every file access, every URL generation goes through the NestJS backend API. MinIO is on a private network — no public endpoints.
 
@@ -54,7 +54,7 @@
   ┌─────────────────────────────────────────────────────────────────────────┐
   │  MINIO (Object Storage — Production)                                     │
   │                                                                           │
-  │  Bucket: ims-portal (private — no public access policy)                  │
+  │  Bucket: teachly (private — no public access policy)                  │
   │                                                                           │
   │  /{institute_id}/                                                         │
   │    /materials/    → PDF study materials (one per material record)         │
@@ -84,7 +84,7 @@
 ## 2. Storage Folder Structure
 
 ```
-MinIO Bucket: ims-portal
+MinIO Bucket: teachly
 │
 ├── {institute_id_aaa-111}/                     ← Institute A (isolated namespace)
 │   │
@@ -273,7 +273,7 @@ Admin selects PDF file in browser
 │  FileUploadService.uploadFile()      │
 │                                     │
 │  minioClient.putObject(             │
-│    bucket: 'ims-portal',            │
+│    bucket: 'teachly',            │
 │    object: path,                    │
 │    stream: file.buffer,             │
 │    size: file.size,                 │
@@ -383,12 +383,12 @@ Student or Admin wants to view a file
 │  FileUploadService.generatePresignedUrl()                                   │
 │                                                                             │
 │  minioClient.presignedGetObject(                                            │
-│    bucket:  'ims-portal',                                                   │
+│    bucket:  'teachly',                                                   │
 │    object:  '/{institute_id}/materials/{material_id}.pdf',                  │
 │    expiry:  900   ← 15 minutes in seconds                                   │
 │  )                                                                          │
 │                                                                             │
-│  Returns: https://minio.host/ims-portal/{path}?X-Amz-Expires=900           │
+│  Returns: https://minio.host/teachly/{path}?X-Amz-Expires=900           │
 │           &X-Amz-Signature=abc123...&X-Amz-Date=...                        │
 └────────────────────────────────────┬───────────────────────────────────────┘
                                      │
@@ -468,7 +468,7 @@ This adapter pattern means:
       "Effect": "Deny",
       "Principal": "*",
       "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
-      "Resource": "arn:aws:s3:::ims-portal/*"
+      "Resource": "arn:aws:s3:::teachly/*"
     }
   ]
 }
@@ -769,7 +769,7 @@ ASSESSMENT SOFT DELETED
 │                                                                           │
 │  Pre-signed URL expiry:  15 minutes (all file types)                     │
 │  Dev storage:            ./uploads/  (local filesystem)                  │
-│  Prod storage:           MinIO bucket 'ims-portal' (private)             │
+│  Prod storage:           MinIO bucket 'teachly' (private)             │
 │  Adapter:                STORAGE_TYPE env var switches between them       │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
