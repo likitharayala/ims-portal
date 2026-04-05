@@ -1,7 +1,7 @@
 'use client';
 
-import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import { useParams } from 'next/navigation';
 import { useStudentResult } from '@/hooks/use-assessments';
 
 export default function StudentResultPage() {
@@ -10,24 +10,22 @@ export default function StudentResultPage() {
 
   if (isLoading) {
     return (
-      <div className="p-6 max-w-3xl mx-auto">
-        <div className="animate-pulse h-8 w-48 bg-slate-200 rounded mb-4" />
-        <div className="animate-pulse h-64 bg-slate-100 rounded-xl" />
+      <div className="mx-auto max-w-3xl p-6">
+        <div className="mb-4 h-8 w-48 animate-pulse rounded bg-slate-200" />
+        <div className="h-64 animate-pulse rounded-xl bg-slate-100" />
       </div>
     );
   }
 
   if (error || !submission) {
     return (
-      <div className="p-6 max-w-3xl mx-auto text-center">
-        <p className="text-slate-500 text-sm mb-2">
-          Results have not been released yet.
-        </p>
+      <div className="mx-auto max-w-3xl p-6 text-center">
+        <p className="mb-2 text-sm text-slate-500">Results have not been released yet.</p>
         <Link
           href="/student/assessments"
-          className="text-blue-600 hover:underline text-sm"
+          className="text-sm text-blue-600 hover:underline"
         >
-          ← Back to Assessments
+          Back to Assessments
         </Link>
       </div>
     );
@@ -36,71 +34,175 @@ export default function StudentResultPage() {
   const questions = submission.assessment?.questions ?? [];
   const answers = (submission.answers as Record<string, any>) ?? {};
   const feedback = (submission.feedback as Record<string, any>) ?? {};
-  const totalMarks = submission.totalMarks !== null && submission.totalMarks !== undefined
-    ? Number(submission.totalMarks)
-    : null;
-  const maxMarks = submission.assessment?.totalMarks ?? '—';
+  const totalMarks =
+    submission.totalMarks !== null && submission.totalMarks !== undefined
+      ? Number(submission.totalMarks)
+      : null;
+  const maxMarks =
+    typeof submission.assessment?.totalMarks === 'number'
+      ? submission.assessment.totalMarks
+      : 0;
+
+  const attemptedCount = questions.filter((question: any) => {
+    const answer = answers[question.id];
+    if (question.questionType === 'mcq') return Boolean(answer?.selectedOption);
+    return Boolean(answer?.text);
+  }).length;
+
+  const mcqQuestions = questions.filter((question: any) => question.questionType === 'mcq');
+  const mcqCorrect = mcqQuestions.filter((question: any) => {
+    const answer = answers[question.id];
+    return question.correctOption && answer?.selectedOption === question.correctOption;
+  }).length;
+  const mcqWrong = mcqQuestions.filter((question: any) => {
+    const answer = answers[question.id];
+    return (
+      question.correctOption &&
+      answer?.selectedOption &&
+      answer.selectedOption !== question.correctOption
+    );
+  }).length;
+  const missedMcqCount = Math.max(mcqQuestions.length - mcqCorrect - mcqWrong, 0);
+  const unattemptedCount = Math.max(questions.length - attemptedCount, 0);
+
+  const scorePercent =
+    totalMarks !== null && maxMarks > 0
+      ? Math.min(100, Math.max(0, Math.round((totalMarks / maxMarks) * 100)))
+      : 0;
+  const attemptPercent =
+    questions.length > 0 ? Math.round((attemptedCount / questions.length) * 100) : 0;
+  const mcqBase = mcqQuestions.length || 1;
+  const correctPercent = Math.round((mcqCorrect / mcqBase) * 100);
+  const wrongPercent = Math.round((mcqWrong / mcqBase) * 100);
+  const missedPercent = Math.max(100 - correctPercent - wrongPercent, 0);
 
   return (
-    <div className="p-6 max-w-3xl mx-auto">
-      <div className="flex items-center gap-3 mb-6">
+    <div className="mx-auto max-w-3xl p-6">
+      <div className="mb-6 flex items-center gap-3">
         <Link
           href="/student/assessments"
-          className="text-slate-400 hover:text-slate-600 text-sm"
+          className="text-sm text-slate-400 hover:text-slate-600"
         >
-          ← Assessments
+          Assessments
         </Link>
         <h1 className="text-xl font-semibold text-slate-800">
-          {submission.assessment?.title} — Result
+          {submission.assessment?.title} Result
         </h1>
       </div>
 
-      {/* Score card */}
-      <div className="bg-white rounded-xl border border-slate-200 p-6 mb-6 text-center">
-        <p className="text-xs text-slate-500 uppercase font-medium mb-1">
-          Your Score
-        </p>
-        <p className="text-5xl font-bold text-slate-800 mb-1">
-          {totalMarks ?? '—'}
-        </p>
+      <div className="mb-6 rounded-xl border border-slate-200 bg-white p-6 text-center">
+        <p className="mb-1 text-xs font-medium uppercase text-slate-500">Your Score</p>
+        <p className="mb-1 text-5xl font-bold text-slate-800">{totalMarks ?? 0}</p>
         <p className="text-slate-500">out of {maxMarks}</p>
         {submission.status === 'absent' && (
-          <p className="mt-3 text-sm text-orange-600 font-medium">Absent</p>
+          <p className="mt-3 text-sm font-medium text-orange-600">Absent</p>
         )}
       </div>
 
-      {/* Per-question breakdown */}
+      <div className="mb-6 rounded-xl border border-slate-200 bg-white p-6">
+        <div className="mb-5">
+          <h2 className="text-base font-semibold text-slate-800">Performance Analysis</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            A quick visual summary of your performance.
+          </p>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-3">
+          <div className="rounded-xl bg-slate-50 p-4">
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-sm font-medium text-slate-700">Score</p>
+              <span className="text-sm font-semibold text-blue-700">{scorePercent}%</span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-slate-200">
+              <div
+                className="h-full rounded-full bg-blue-600"
+                style={{ width: `${scorePercent}%` }}
+              />
+            </div>
+            <p className="mt-3 text-xs text-slate-500">
+              {totalMarks ?? 0} out of {maxMarks} marks
+            </p>
+          </div>
+
+          <div className="rounded-xl bg-slate-50 p-4">
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-sm font-medium text-slate-700">Attempt Rate</p>
+              <span className="text-sm font-semibold text-emerald-700">{attemptPercent}%</span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-slate-200">
+              <div
+                className="h-full rounded-full bg-emerald-500"
+                style={{ width: `${attemptPercent}%` }}
+              />
+            </div>
+            <p className="mt-3 text-xs text-slate-500">
+              {attemptedCount} of {questions.length} questions attempted
+            </p>
+          </div>
+
+          <div className="rounded-xl bg-slate-50 p-4">
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-sm font-medium text-slate-700">MCQ Accuracy</p>
+              <span className="text-sm font-semibold text-violet-700">{correctPercent}%</span>
+            </div>
+            <div className="flex h-2 overflow-hidden rounded-full bg-slate-200">
+              <div className="h-full bg-emerald-500" style={{ width: `${correctPercent}%` }} />
+              <div className="h-full bg-rose-400" style={{ width: `${wrongPercent}%` }} />
+              <div className="h-full bg-slate-300" style={{ width: `${missedPercent}%` }} />
+            </div>
+            <div className="mt-3 flex items-center gap-3 text-xs text-slate-500">
+              <span className="text-emerald-600">{mcqCorrect} correct</span>
+              <span className="text-rose-500">{mcqWrong} wrong</span>
+              <span>{missedMcqCount} missed</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-5 grid gap-3 sm:grid-cols-3">
+          <div className="rounded-lg border border-slate-200 px-4 py-3">
+            <p className="text-xs uppercase tracking-wide text-slate-400">Questions</p>
+            <p className="mt-1 text-xl font-semibold text-slate-800">{questions.length}</p>
+          </div>
+          <div className="rounded-lg border border-slate-200 px-4 py-3">
+            <p className="text-xs uppercase tracking-wide text-slate-400">Attempted</p>
+            <p className="mt-1 text-xl font-semibold text-slate-800">{attemptedCount}</p>
+          </div>
+          <div className="rounded-lg border border-slate-200 px-4 py-3">
+            <p className="text-xs uppercase tracking-wide text-slate-400">Unattempted</p>
+            <p className="mt-1 text-xl font-semibold text-slate-800">{unattemptedCount}</p>
+          </div>
+        </div>
+      </div>
+
       {questions.length > 0 && (
         <div className="space-y-3">
-          <h2 className="font-semibold text-slate-700 text-sm">
-            Question Breakdown
-          </h2>
-          {questions.map((q: any) => {
-            const answer = answers[q.id];
-            const fb = feedback[q.id];
+          <h2 className="text-sm font-semibold text-slate-700">Question Breakdown</h2>
+          {questions.map((question: any) => {
+            const answer = answers[question.id];
+            const questionFeedback = feedback[question.id];
             const isCorrect =
-              q.questionType === 'mcq' &&
-              q.correctOption &&
-              answer?.selectedOption === q.correctOption;
+              question.questionType === 'mcq' &&
+              question.correctOption &&
+              answer?.selectedOption === question.correctOption;
             const isWrong =
-              q.questionType === 'mcq' &&
-              q.correctOption &&
+              question.questionType === 'mcq' &&
+              question.correctOption &&
               answer?.selectedOption &&
-              answer.selectedOption !== q.correctOption;
+              answer.selectedOption !== question.correctOption;
 
             return (
               <div
-                key={q.id}
-                className="bg-white rounded-xl border border-slate-200 p-4"
+                key={question.id}
+                className="rounded-xl border border-slate-200 bg-white p-4"
               >
-                <div className="flex items-start gap-2 mb-2">
-                  <span className="flex-shrink-0 w-6 h-6 bg-slate-100 rounded text-xs flex items-center justify-center font-medium text-slate-600">
-                    {q.questionNumber}
+                <div className="mb-2 flex items-start gap-2">
+                  <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded bg-slate-100 text-xs font-medium text-slate-600">
+                    {question.questionNumber}
                   </span>
-                  <p className="text-sm text-slate-800">{q.questionText}</p>
+                  <p className="text-sm text-slate-800">{question.questionText}</p>
                 </div>
 
-                {q.questionType === 'mcq' ? (
+                {question.questionType === 'mcq' ? (
                   <div className="ml-8 text-sm">
                     {answer?.selectedOption ? (
                       <p>
@@ -111,44 +213,44 @@ export default function StudentResultPage() {
                           }`}
                         >
                           {answer.selectedOption}
-                          {isCorrect ? ' ✓' : ' ✗'}
+                          {isCorrect ? ' OK' : ' X'}
                         </span>
                       </p>
                     ) : (
-                      <p className="text-slate-400 text-xs">Not attempted</p>
+                      <p className="text-xs text-slate-400">Not attempted</p>
                     )}
-                    {q.correctOption && (
+                    {question.correctOption && (
                       <p className="text-xs text-green-600">
-                        Correct: {q.correctOption}
+                        Correct: {question.correctOption}
                       </p>
                     )}
-                    <p className="text-xs text-slate-500 mt-0.5">
+                    <p className="mt-0.5 text-xs text-slate-500">
                       {isCorrect
-                        ? `+${Number(q.marks)}`
+                        ? `+${Number(question.marks)}`
                         : isWrong && submission.assessment?.negativeMarking
-                        ? `-${Number(submission.assessment.negativeValue ?? 0)}`
-                        : '0'}{' '}
+                          ? `-${Number(submission.assessment.negativeValue ?? 0)}`
+                          : '0'}{' '}
                       marks
                     </p>
                   </div>
                 ) : (
                   <div className="ml-8">
                     {answer?.text ? (
-                      <p className="text-sm text-slate-600 bg-slate-50 p-2 rounded border border-slate-200 whitespace-pre-wrap">
+                      <p className="whitespace-pre-wrap rounded border border-slate-200 bg-slate-50 p-2 text-sm text-slate-600">
                         {answer.text}
                       </p>
                     ) : (
                       <p className="text-xs text-slate-400">Not attempted</p>
                     )}
                     <div className="mt-2 flex items-center gap-3">
-                      {fb && (
+                      {questionFeedback && (
                         <>
                           <span className="text-sm font-medium text-slate-700">
-                            {fb.marks} / {Number(q.marks)} marks
+                            {questionFeedback.marks} / {Number(question.marks)} marks
                           </span>
-                          {fb.comment && (
-                            <span className="text-xs text-slate-500 italic">
-                              &quot;{fb.comment}&quot;
+                          {questionFeedback.comment && (
+                            <span className="text-xs italic text-slate-500">
+                              &quot;{questionFeedback.comment}&quot;
                             </span>
                           )}
                         </>
