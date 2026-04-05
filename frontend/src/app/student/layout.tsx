@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { StudentSidebar } from '@/components/StudentSidebar';
@@ -54,7 +55,7 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
-          <span className="text-lg font-bold text-blue-600">Teachly</span>
+          <Image src="/logo.png" alt="Teachly" width={130} height={40} className="h-9 w-auto object-contain" priority />
           {unreadCount > 0 && (
             <span className="ml-auto bg-blue-600 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[18px] text-center">
               {unreadCount > 99 ? '99+' : unreadCount}

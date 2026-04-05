@@ -61,126 +61,149 @@ export default function AdminDashboardPage() {
   const attendancePendingCount = 0;
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      {/* Welcome */}
+    <div className="mx-auto max-w-6xl p-4 sm:p-6">
       <div className="mb-8">
         <h1 className="text-2xl font-semibold text-slate-800">
-          Welcome back, {user?.name?.split(' ')[0]} 👋
+          Welcome back, {user?.name?.split(' ')[0]}
         </h1>
         <p className="text-sm text-slate-500 mt-1">
-          Here's what's happening at your institute today.
+          Here is a clear summary of student activity, pending work, and the most
+          important tasks to review today.
         </p>
       </div>
 
-      {/* Stat cards — 2×2 on mobile, 4-in-a-row on desktop */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="mb-4">
+        <h2 className="text-base font-semibold text-slate-800">Institute Overview</h2>
+        <p className="text-sm text-slate-500 mt-1">
+          Use these numbers to quickly understand the current status of students,
+          payments, materials, and assessments.
+        </p>
+      </div>
+
+      <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Link href="/admin/students" className="block">
           <StatCard
-            label="Total Students"
+            label="Active Students"
             value={stats?.totalStudents ?? 0}
-            sub="Active enrollments"
+            sub="Students currently enrolled in your institute"
             color="text-blue-700"
             loading={isLoading}
           />
         </Link>
+
         <Link href="/admin/payments?tab=pending" className="block">
           <StatCard
             label="Pending Payments"
             value={stats?.pendingPayments.count ?? 0}
             sub={
               stats
-                ? `${formatINR(stats.pendingPayments.totalAmount)} outstanding`
-                : 'Loading…'
+                ? `${formatINR(stats.pendingPayments.totalAmount)} still pending collection`
+                : 'Loading...'
             }
             color="text-amber-600"
             loading={isLoading}
           />
         </Link>
+
         <Link href="/admin/materials" className="block">
           <StatCard
             label="Study Materials"
             value={stats?.totalMaterials ?? 0}
-            sub="Visible to students"
+            sub="Materials currently available for students"
             color="text-purple-700"
             loading={isLoading}
           />
         </Link>
+
         <Link href="/admin/assessments" className="block">
           <StatCard
             label="Active Assessments"
             value={stats?.activeAssessments ?? 0}
-            sub="Published + active"
+            sub="Assessments that are published or currently running"
             color="text-green-700"
             loading={isLoading}
           />
         </Link>
       </div>
 
-      {/* Needs attention today */}
       <div className="mb-8">
         <div className="bg-white rounded-xl border border-slate-200 p-5">
           <h2 className="text-base font-semibold text-slate-800 mb-4">
             Needs Attention Today
           </h2>
+          <p className="text-sm text-slate-500 mb-4">
+            Review these items first to keep daily operations complete and up to
+            date.
+          </p>
 
           <div className="space-y-3">
             <div className="flex items-center gap-3 rounded-lg border border-red-100 bg-red-50 px-4 py-3">
-              <span className="text-lg">⚠</span>
-              <p className="text-sm text-slate-700">
+              <span className="text-lg" aria-hidden="true">
+                !
+              </span>
+              <p className="text-sm leading-6 text-slate-700">
                 <span className="font-semibold text-slate-900">
                   {overduePaymentsCount}
                 </span>{' '}
-                payments overdue
+                payment record{overduePaymentsCount === 1 ? '' : 's'} overdue.
+                These payments need follow-up because they have not been cleared on
+                time.
               </p>
             </div>
 
             <div className="flex items-center gap-3 rounded-lg border border-amber-100 bg-amber-50 px-4 py-3">
-              <span className="text-lg">📝</span>
-              <p className="text-sm text-slate-700">
+              <span className="text-lg" aria-hidden="true">
+                i
+              </span>
+              <p className="text-sm leading-6 text-slate-700">
                 <span className="font-semibold text-slate-900">
                   {assessmentsEndingToday}
                 </span>{' '}
-                assessment{assessmentsEndingToday === 1 ? '' : 's'} ending today
+                assessment{assessmentsEndingToday === 1 ? '' : 's'} ending
+                today. Review timings and student submissions before the exam
+                window closes.
               </p>
             </div>
 
             <div className="flex items-center gap-3 rounded-lg border border-blue-100 bg-blue-50 px-4 py-3">
-              <span className="text-lg">📌</span>
-              <p className="text-sm text-slate-700">
-                Attendance not marked for{' '}
+              <span className="text-lg" aria-hidden="true">
+                *
+              </span>
+              <p className="text-sm leading-6 text-slate-700">
+                Attendance is still pending for{' '}
                 <span className="font-semibold text-slate-900">
                   {attendancePendingCount}
                 </span>{' '}
-                batch{attendancePendingCount === 1 ? '' : 'es'}
+                batch{attendancePendingCount === 1 ? '' : 'es'}. Mark
+                attendance to keep daily records complete.
               </p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Empty state for new institutes */}
       {!isLoading && stats?.totalStudents === 0 && (
-        <div className="bg-white rounded-xl border border-slate-200 border-dashed p-12 text-center">
-          <p className="text-4xl mb-4">🎉</p>
+        <div className="bg-white rounded-xl border border-slate-200 border-dashed p-8 text-center sm:p-12">
           <h2 className="text-lg font-semibold text-slate-800 mb-2">
-            Welcome to Teachly!
+            Your dashboard is ready
           </h2>
           <p className="text-sm text-slate-500 mb-6 max-w-sm mx-auto">
-            Your institute is set up. Start by adding students, then upload study materials or
-            create an assessment.
+            Your institute setup is complete. Start by adding students, then
+            continue with materials, assessments, payments, and attendance from
+            one place.
           </p>
           <div className="flex gap-3 justify-center flex-wrap">
             <a
               href="/admin/students/new"
               className="px-5 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
             >
-              Add First Student
+              Add Your First Student
             </a>
             <a
               href="/admin/settings"
               className="px-5 py-2.5 border border-slate-300 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50"
             >
-              Institute Settings
+              Review Institute Settings
             </a>
           </div>
         </div>

@@ -222,7 +222,7 @@ export function BulkUploadModal({ onClose }: Props) {
         {result && (
           <div className="space-y-5">
             {/* Summary stats */}
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div className="text-center p-4 bg-green-50 rounded-xl border border-green-100">
                 <p className="text-3xl font-bold text-green-700">{result.created}</p>
                 <p className="text-xs text-green-600 mt-1 font-medium">Created</p>

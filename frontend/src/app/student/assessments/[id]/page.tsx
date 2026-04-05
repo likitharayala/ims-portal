@@ -89,7 +89,7 @@ export default function AssessmentInstructionsPage() {
           <p className="text-sm text-blue-600 mb-4">{assessment.subject}</p>
         )}
 
-        <div className="grid grid-cols-2 gap-4 mb-6 p-4 bg-slate-50 rounded-lg">
+        <div className="mb-6 grid grid-cols-1 gap-4 rounded-lg bg-slate-50 p-4 sm:grid-cols-2">
           <div>
             <p className="text-xs text-slate-500">Total Marks</p>
             <p className="font-semibold text-slate-800">{assessment.totalMarks}</p>
@@ -117,7 +117,7 @@ export default function AssessmentInstructionsPage() {
             </div>
           )}
           {assessment.negativeMarking && (
-            <div className="col-span-2">
+            <div className="sm:col-span-2">
               <p className="text-xs text-orange-600 font-medium">
                 ⚠ Negative marking enabled — wrong MCQ answers will deduct marks
               </p>

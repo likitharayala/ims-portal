@@ -6,15 +6,14 @@ import { Providers } from './providers';
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
 export const metadata: Metadata = {
-  
-  title: 'Teachly — Institute Management',
-  description: 'Multi-tenant institute management system for tuition centres',
+  title: 'Teachly | Institute Management System',
+  description: 'Teachly is a multi-tenant institute management system for tuition centres',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={inter.variable}>
-      <body className="antialiased bg-gray-50 text-slate-800 font-sans">
+      <body className="bg-gray-50 font-sans text-slate-800 antialiased">
         <Providers>{children}</Providers>
       </body>
     </html>

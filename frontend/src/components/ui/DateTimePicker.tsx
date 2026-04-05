@@ -159,7 +159,7 @@ export function DateTimePicker({ value, onChange, placeholder = 'Select date & t
       if (!triggerRef.current) return;
 
       const rect = triggerRef.current.getBoundingClientRect();
-      const popupWidth = 320;
+      const popupWidth = Math.min(320, window.innerWidth - gutter * 2);
       const popupHeight = 540;
       const gutter = 16;
 
@@ -272,7 +272,7 @@ export function DateTimePicker({ value, onChange, placeholder = 'Select date & t
         <div
           ref={popupRef}
           style={{ top: popupStyle.top, left: popupStyle.left }}
-          className="fixed z-[70] bg-white border border-slate-200 rounded-xl shadow-xl p-4 w-[320px]"
+          className="fixed z-[70] w-[min(320px,calc(100vw-2rem))] rounded-xl border border-slate-200 bg-white p-4 shadow-xl"
         >
 
           {/* Calendar header */}
