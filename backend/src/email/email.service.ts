@@ -1,22 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import * as nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
-  private transporter: nodemailer.Transporter;
+  private readonly resend: Resend;
 
   constructor(private readonly config: ConfigService) {
-    this.transporter = nodemailer.createTransport({
-      host: this.config.get<string>('SMTP_HOST'),
-      port: this.config.get<number>('SMTP_PORT'),
-      secure: false,
-      auth: {
-        user: this.config.get<string>('SMTP_USER'),
-        pass: this.config.get<string>('SMTP_PASS'),
-      },
-    });
+    this.resend = new Resend(this.config.get<string>('RESEND_API_KEY'));
   }
 
   async sendVerificationEmail(email: string, name: string, token: string): Promise<void> {
@@ -82,12 +74,16 @@ export class EmailService {
 
   private async send(options: { to: string; subject: string; html: string }): Promise<void> {
     try {
-      await this.transporter.sendMail({
-        from: this.config.get<string>('SMTP_FROM'),
+      const { error } = await this.resend.emails.send({
+        from: 'Teachly <onboarding@resend.dev>',
         to: options.to,
         subject: options.subject,
         html: options.html,
       });
+
+      if (error) {
+        throw new Error(error.message);
+      }
     } catch (error) {
       this.logger.error(`Failed to send email to ${options.to}: ${(error as Error).message}`);
       throw error;

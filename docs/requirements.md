@@ -1,5 +1,23 @@
 # Requirements
 
+## Email Provider
+
+The backend email transport now uses Resend instead of SMTP/Nodemailer.
+
+Current provider details:
+- package: `resend`
+- auth: `RESEND_API_KEY`
+- sender: `Teachly <onboarding@resend.dev>`
+
+This change only affects the transport layer inside `EmailService`.
+
+This does **not** change:
+- signup flow
+- background job behavior
+- retry behavior
+- auth flow
+- JWT behavior
+
 ## Admin Signup Flow (Phase 1)
 
 ### Summary
