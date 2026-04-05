@@ -4,6 +4,13 @@ import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  const configuredOrigins = (process.env.FRONTEND_URL ?? '')
+    .split(',')
+    .map((origin) => origin.trim().replace(/\/$/, ''))
+    .filter(Boolean);
+  const shouldFallbackToDynamicOrigin =
+    configuredOrigins.length === 0 ||
+    configuredOrigins.every((origin) => origin.includes('localhost'));
 
   // Global validation pipe
   app.useGlobalPipes(
@@ -16,16 +23,33 @@ async function bootstrap() {
 
   // CORS — frontend domain only
   app.enableCors({
-    origin: process.env.FRONTEND_URL ?? 'http://localhost:3000',
+    origin: (origin, callback) => {
+      if (!origin) {
+        callback(null, true);
+        return;
+      }
+
+      const normalizedOrigin = origin.replace(/\/$/, '');
+
+      if (
+        configuredOrigins.includes(normalizedOrigin) ||
+        shouldFallbackToDynamicOrigin
+      ) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error(`Origin ${origin} not allowed by CORS`), false);
+    },
     credentials: true,
   });
 
   // Global prefix
   app.setGlobalPrefix('api/v1');
 
-  const port = process.env.PORT || 3000;
-  await app.listen(port);
-  console.log(`Teachly backend running on http://localhost:${port}/api/v1`);
+  const port = process.env.PORT || 8080;
+  await app.listen(port, '0.0.0.0');
+  console.log(`Teachly backend running on port ${port}/api/v1`);
 }
 
 bootstrap();
