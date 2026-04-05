@@ -135,9 +135,10 @@ export default function StudentDashboardPage() {
           ) : (
             <div className="space-y-3">
               {data?.upcomingAssessments.map((a) => (
-                <div
+                <Link
                   key={a.id}
-                  className="bg-white rounded-xl border border-slate-200 p-4"
+                  href={`/student/assessments/${a.id}`}
+                  className="block bg-white rounded-xl border border-slate-200 p-4"
                 >
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <h3 className="font-medium text-slate-800 text-sm">{a.title}</h3>
@@ -163,7 +164,7 @@ export default function StudentDashboardPage() {
                   <p className="text-xs text-slate-400 mt-1">
                     Total marks: {a.totalMarks}
                   </p>
-                </div>
+                </Link>
               ))}
             </div>
           )}
