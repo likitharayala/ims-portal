@@ -1,12 +1,12 @@
-IMS Portal Requirements Summary
+Teachly Requirements Summary
 
-IMS PORTAL – COMPLETE SYSTEM SUMMARY (VERSION 1 + ROADMAP)
+TEACHLY – COMPLETE SYSTEM SUMMARY (VERSION 1 + ROADMAP)
 
 ---
 
 PROJECT VISION
 
-IMS Portal is a multi-tenant SaaS-based Institute Management System designed for tuition centres and small institutes.
+Teachly is a multi-tenant SaaS-based Institute Management System designed for tuition centres and small institutes.
 
 The system allows each institute to register, select features, and dynamically enable only those features in their portal.
 
@@ -968,7 +968,7 @@ Multiple admins per institute
 
 FINAL SYSTEM SUMMARY
 
-IMS Portal is a secure, scalable, open-source SaaS platform for institutes that includes:
+Teachly is a secure, scalable, open-source SaaS platform for institutes that includes:
 
 Multi-tenant architecture
 Role-based access control
