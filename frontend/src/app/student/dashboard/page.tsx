@@ -139,7 +139,19 @@ export default function StudentDashboardPage() {
                 const cardContent = (
                   <>
                     <div className="flex items-start justify-between gap-2 mb-2">
-                      <h3 className="font-medium text-slate-800 text-sm">{a.title}</h3>
+                      <div className="flex items-center gap-2 min-w-0">
+                        {isLocked && (
+                          <span
+                            aria-label="Locked assessment"
+                            className="text-sm text-slate-400"
+                          >
+                            🔒
+                          </span>
+                        )}
+                        <h3 className="font-medium text-slate-800 text-sm truncate">
+                          {a.title}
+                        </h3>
+                      </div>
                       <span
                         className={`flex-shrink-0 text-xs px-2 py-0.5 rounded-full font-medium ${
                           STATUS_BADGE[a.status] ?? 'bg-slate-100 text-slate-600'
