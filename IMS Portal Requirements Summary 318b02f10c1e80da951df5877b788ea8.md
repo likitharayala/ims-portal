@@ -422,13 +422,36 @@ Student can type answers for some questions AND upload a file for the full answe
 Admin sees both typed answers and uploaded files in the evaluation view.
 
 Evaluation:
-Admin opens the evaluation interface per student.
-Admin sees typed answers (MCQ selections + descriptive text) and uploaded files side by side.
-Uploaded images and PDFs are displayed inline in the evaluation interface — no download needed.
+
+Navigation:
+Admin evaluates student by student.
+Admin opens one student's submission, scores all their answers, then moves to the next student.
+
+Evaluation interface per student:
+Admin sees the student's typed answers (MCQ selections + descriptive text) and uploaded files displayed inline side by side.
+Uploaded images and PDFs are shown directly in the interface — no download needed.
 Admin assigns marks per descriptive answer.
-Admin can add feedback/comments per answer (optional).
-MCQ answers are auto-evaluated against correct_option.
-Admin triggers final evaluation to calculate total_marks_awarded per student.
+Admin can add optional feedback/comments per answer.
+MCQ answers are auto-evaluated against correct_option — admin sees the result but cannot override individual MCQ marks.
+
+Mixed submission (typed + uploaded):
+If a student both typed an answer and uploaded a file for the same question, both are shown side by side.
+Admin enters one set of marks — they decide which submission to base marks on.
+
+Upload-only students:
+If a student only uploaded a file (no typed answers), admin can choose to:
+Enter marks per question individually (reading the uploaded sheet).
+Or enter a single total marks number for the entire paper.
+Both options are available and admin decides per evaluation.
+
+Progress tracking:
+A progress bar and count at the top of the evaluation page shows how many students have been evaluated (e.g. "12/30 evaluated").
+Each student in the student list shows a status badge: Evaluated or Pending.
+
+Save behaviour:
+Marks auto-save as admin enters them. Admin can close and resume at any time without losing progress.
+Admin clicks "Finalise Evaluation" at the end to confirm all marks are complete and trigger total_marks_awarded calculation.
+After finalising, admin can still re-evaluate and update marks before releasing results.
 
 MCQ auto-evaluation:
 When assessment is closed, MCQ answers are auto-evaluated against correct_option.
