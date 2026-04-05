@@ -72,6 +72,8 @@ The system is built on a strict 4-layer model. No layer may bypass the one below
 ║   │  Primary DB  │  │ /{inst_id}/    │  │ AI gen   │  │ Cache   │  ║
 ║   │  All data    │  │  /materials/   │  │          │  │ Rate    │  ║
 ║   │  Auto backup │  │  /profiles/    │  │          │  │ limit   │  ║
+║   │              │  │  /questions/   │  │          │  │         │  ║
+║   │              │  │  /submissions/ │  │          │  │         │  ║
 ║   └──────────────┘  └────────────────┘  └──────────┘  └─────────┘  ║
 ╚══════════════════════════════════════════════════════════════════════╝
 ```
@@ -128,7 +130,7 @@ The system is built on a strict 4-layer model. No layer may bypass the one below
 
 ## 3. Request Lifecycle
 
-Every request passes through a deterministic 8-stage pipeline. Stages are ordered to fail fast on the cheapest checks first.
+Every request passes through a deterministic 7-stage pipeline. Stages are ordered to fail fast on the cheapest checks first.
 
 ```
 Incoming HTTPS Request
@@ -138,13 +140,20 @@ Incoming HTTPS Request
 │  STAGE 1 — NGINX                                                     │
 │                                                                      │
 │  • Terminate SSL                                                     │
+│  • CORS: Allow only requests from FRONTEND_URL env var              │
+│      Access-Control-Allow-Origin: $FRONTEND_URL                     │
+│      Access-Control-Allow-Credentials: true  (needed for cookies)  │
 │  • Rate limit check (per IP):                                        │
 │      /auth/login    → 5 req / 15 min                                │
 │      /auth/signup   → 3 req / hour                                  │
 │      /auth/refresh  → 10 req / 15 min                               │
 │      all other      → 100 req / min                                 │
+│  • File upload size: client_max_body_size 55M                       │
+│      Required for 50MB PDF study material uploads                   │
+│      Default NGINX limit is 1MB — uploads silently fail without this│
 │  • Forward to NestJS on internal port                               │
-│  → 429 Too Many Requests if exceeded                                │
+│  → 429 Too Many Requests if rate exceeded                           │
+│  → 413 Request Entity Too Large if body exceeds 55MB               │
 └────────────────────────────┬────────────────────────────────────────┘
                              │
                              ▼
@@ -358,6 +367,49 @@ LOGOUT
 | `access_token` | JS memory (Zustand store) | Never persisted — immune to XSS persistent theft |
 | `refresh_token` | `httpOnly` cookie (`Path=/auth/refresh`, `SameSite=Strict`) | JS cannot read it — immune to XSS |
 
+**Page load / token refresh flow:**
+
+Because `access_token` is in JS memory (Zustand), it is lost on every page refresh or new tab. The frontend handles this transparently on every app mount:
+
+```
+App mounts (page load / refresh / new tab)
+         │
+         ▼
+No access_token in Zustand?
+         │
+         ▼
+POST /auth/refresh  (refresh_token sent automatically via httpOnly cookie)
+         │
+    ┌────┴─────────────────────┐
+    │                          │
+    ▼                          ▼
+200 OK                    401 Unauthorized
+New access_token          Cookie expired / revoked
+stored in Zustand         → redirect /login
+Proceed to page
+```
+
+This means every cold page load triggers one silent `/auth/refresh` call before the page data loads. The frontend must show a loading state (not an error) during this window. All data-fetching components must wait for auth initialisation to complete before making API calls.
+
+**`/auth/me` response:**
+
+After login or token refresh, the frontend calls `GET /auth/me` to load user context:
+
+```json
+{
+  "id": "<user_id>",
+  "name": "...",
+  "email": "...",
+  "role": "admin | student",
+  "institute_id": "...",
+  "institute_name": "...",
+  "features": ["students", "materials", "assessments"],
+  "must_change_password": false
+}
+```
+
+This response drives: sidebar rendering, feature guard on frontend, forced password change redirect, and institute name in header.
+
 ---
 
 ## 7. Admin vs Student Access Separation
@@ -404,29 +456,33 @@ Request path check (runs on every navigation):
 /           → landing page (public)
 ```
 
-**Document viewer — student-specific security controls:**
-
-The study materials viewer enforces 4 security controls for students:
+**Document viewer — student controls:**
 
 ```
 Student opens material
         │
         ▼
-┌───────────────────────────────────────────┐
-│  Secure Document Viewer Component         │
-│                                           │
-│  ✓ Download button — disabled/hidden      │
-│  ✓ Right-click — event.preventDefault()  │
-│  ✓ Print — CSS @media print { display:   │
-│    none } + beforeprint event blocked     │
-│  ✓ Watermark — student's own name        │
-│    overlaid across document               │
-│  ✓ Word search — in-document text search  │
-│                                           │
-│  Note: screenshot prevention cannot be   │
-│  guaranteed in browsers — by design      │
-└───────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────┐
+│  Document Viewer Component                                │
+│                                                           │
+│  Accountability control (meaningful):                     │
+│  ✓ Watermark — student's own name overlaid on document   │
+│    Cannot be stripped; creates accountability if shared  │
+│                                                           │
+│  UI friction (easily bypassed by technical users):        │
+│  • Download button hidden — bypassed via DevTools/Network │
+│  • Right-click preventDefault() — bypassed in settings   │
+│  • CSS print block — bypassed via browser PDF viewer     │
+│                                                           │
+│  Functional feature:                                      │
+│  ✓ Word search — in-document text search via PDF.js      │
+│    (text-based PDFs only; scanned PDFs not searchable)   │
+│                                                           │
+│  Cannot prevent: screenshots, screen recording, camera   │
+└───────────────────────────────────────────────────────────┘
 ```
+
+**Honest summary:** The watermark is the only meaningful control — it identifies the student if the document is shared. All other controls are UI-level friction. Do not communicate to institute admins that the viewer "protects" documents from copying — it does not. It creates accountability, not prevention.
 
 ---
 
@@ -488,7 +544,76 @@ Two environments with distinct infrastructure:
 
 ---
 
-## 9. Component Responsibility Summary
+## 9. Cron Job Execution Context
+
+Cron jobs run on a separate execution path — they are **not** HTTP requests and do not pass through the guard chain. They have no `req.user`, no `req.instituteId`, and no JWT. This means the standard pattern of "inject `institute_id` from request context" does not apply.
+
+**How crons work:**
+
+```
+NestJS @Cron('0 0 1 * *')         ← runs at 00:00 on 1st of month
+         │
+         │  No guard chain. No JWT. No institute context.
+         ▼
+CronService.run()
+         │
+         ├─ SELECT id FROM institutes WHERE is_active = true
+         │   ← must explicitly fetch all institutes to iterate
+         │
+         ├─ For each institute_id:
+         │     SELECT id FROM students
+         │     WHERE institute_id = $id AND is_deleted = false
+         │
+         └─ INSERT INTO payments (institute_id, student_id, ...)
+              ← institute_id injected explicitly from the loop variable,
+                not from request context
+```
+
+**Three cron jobs in the system:**
+
+| Cron | Schedule | What it does | Institute scope |
+|---|---|---|---|
+| `PaymentAutoGenerateCron` | 1st of every month, 00:00 UTC | Creates `pending` payment records for all active students | All active institutes |
+| `PaymentAutoOverdueCron` | Daily, 02:00 UTC | Transitions `pending → overdue` for payments past 5-day grace period | All active institutes |
+| `AssessmentStatusCron` | Every 60 seconds | Transitions assessment status `published→active` and `active→closed`; auto-submits open submissions on close | All active institutes |
+
+**Hard rules for cron code:**
+- Always filter `WHERE is_active = true` on institutes — do not touch deactivated institute data
+- Always filter `WHERE is_deleted = false` on all records — same discipline as HTTP requests
+- Cron writes do NOT produce audit log entries (no `actor_id` available) — this is a known limitation; log to application logger instead
+- Each cron must be idempotent — safe to re-run if the scheduler fires twice (use `INSERT ... ON CONFLICT DO NOTHING`)
+
+---
+
+## 10. Health Check Endpoint
+
+`GET /health` — public route (`@Public()`), no auth required.
+
+Used by: NGINX upstream health checks, Docker/Kubernetes readiness probes, uptime monitors.
+
+```json
+{
+  "status": "ok",
+  "db": "ok",
+  "storage": "ok",
+  "timestamp": "2025-03-05T10:00:00.000Z"
+}
+```
+
+**Checks performed:**
+- `db`: Runs `SELECT 1` against Supabase PostgreSQL — confirms DB connectivity
+- `storage`: Checks MinIO bucket exists and is accessible
+
+**Failure response (503 Service Unavailable):**
+```json
+{ "status": "degraded", "db": "ok", "storage": "error" }
+```
+
+NGINX upstream should mark the instance as down after 2 consecutive failures. This enables zero-downtime deploys in Phase 3 (new instance must pass health check before receiving traffic).
+
+---
+
+## 12. Component Responsibility Summary
 
 | Component | Responsibility |
 |---|---|
@@ -506,5 +631,7 @@ Two environments with distinct infrastructure:
 | ExcelTemplateService | Generates downloadable template + validates uploaded Excel on bulk student import |
 | NotificationsModule | In-app notifications — admin creates, students receive; unread badge count via `notification_recipients` |
 | PaymentCronService | Two cron jobs: (1) 1st of month — auto-create pending records for all active students; (2) daily — transition pending→overdue after 5-day grace period |
+| AssessmentStatusCronService | Runs every 60s — transitions assessment status published→active and active→closed; auto-submits open submissions on close |
+| HealthController | `GET /health` — public endpoint; checks DB + MinIO connectivity; used by load balancers and uptime monitors |
 | Supabase PostgreSQL | Primary data store — all tables, all tenants, accessed only by NestJS |
-| MinIO | File storage — study materials, student profile photos; pre-signed 15-min URLs |
+| MinIO | File storage — study materials, profile photos, question images, answer sheet uploads; pre-signed 15-min URLs |
