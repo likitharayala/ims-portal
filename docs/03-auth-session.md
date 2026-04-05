@@ -149,15 +149,21 @@ Refresh token hash stored in `users.refresh_token_hash`. On use, old token is in
 Every protected request passes through the following guard chain in order:
 
 ```
-1. RateLimitGuard       → enforce per-route rate limits
-2. InstituteContextGuard → extract institute_id from JWT, load institute config
-3. JwtAuthGuard         → validate JWT signature and expiry
-4. SessionGuard         → compare JWT session_id vs DB users.session_id
-5. RolesGuard           → check user role against required role for route
-6. FeatureGuard         → check if required feature is enabled for this institute
+1. RateLimitGuard              → enforce per-route rate limits
+2. InstituteContextMiddleware  → extract institute_id from JWT, bind to request context
+3. JwtAuthGuard                → verify JWT signature + expiry + compare session_id vs DB
+                                  (session check is part of JwtAuthGuard, not separate)
+4. RolesGuard                  → check user role against required role for route
+5. FeatureGuard                → check if required feature is enabled for this institute
 ```
 
-All 6 must pass. Failure at any stage returns appropriate error and stops the chain.
+All 5 must pass. Failure at any stage returns appropriate error and stops the chain.
+
+**Session check inside JwtAuthGuard (step 3):**
+- Verify JWT signature and expiry
+- Extract `session_id` from JWT payload
+- Query `users.session_id` from DB
+- If JWT `session_id` !== DB `session_id` → 401 `SESSION_INVALIDATED`
 
 ---
 

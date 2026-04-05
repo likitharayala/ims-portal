@@ -386,7 +386,9 @@ LOGOUT
 │   │ • Notifs      │    │                  │                          │
 │   │               │    │ Write-only on:   │                          │
 │   │ Evaluation    │    │ • Submissions    │                          │
-│   │ Dashboard     │    │ • Own password   │                          │
+│   │ Dashboard     │    │ • Answer uploads │                          │
+│   │               │    │ • Own password   │                          │
+│   │               │    │ • Dismiss notifs │                          │
 │   └───────────────┘    └──────────────────┘                          │
 └──────────────────────────────────────────────────────────────────────┘
 ```
@@ -446,8 +448,11 @@ Two environments with distinct infrastructure:
 │  .env.development:                                              │
 │  DATABASE_URL=postgresql://localhost:5432/ims_dev               │
 │  JWT_SECRET=dev-secret                                          │
+│  JWT_REFRESH_SECRET=dev-refresh-secret                          │
 │  STORAGE_TYPE=local                                             │
 │  STORAGE_PATH=./uploads                                         │
+│  FRONTEND_URL=http://localhost:3000                             │
+│  APP_ENV=development                                            │
 └─────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────┐
@@ -464,11 +469,15 @@ Two environments with distinct infrastructure:
 │  .env.production:                                               │
 │  DATABASE_URL=postgresql://[supabase-connection-string]         │
 │  JWT_SECRET=[strong-random-secret]                              │
+│  JWT_REFRESH_SECRET=[strong-random-secret]                      │
 │  STORAGE_TYPE=minio                                             │
 │  MINIO_ENDPOINT=...                                             │
 │  MINIO_ACCESS_KEY=...                                           │
 │  MINIO_SECRET_KEY=...                                           │
+│  MINIO_BUCKET_NAME=ims-portal                                   │
 │  OPENAI_API_KEY=...                                             │
+│  FRONTEND_URL=https://your-domain.com                           │
+│  APP_ENV=production                                             │
 │  SMTP_HOST=smtp.gmail.com                                       │
 │  SMTP_PORT=587                                                  │
 │  SMTP_USER=...                                                  │
