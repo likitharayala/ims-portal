@@ -57,8 +57,8 @@ export default function AdminDashboardPage() {
   });
 
   const overduePaymentsCount = stats?.pendingPayments.count ?? 0;
-  const assessmentsEndingToday = 0;
-  const attendancePendingCount = 0;
+  const assessmentsEndingToday: number = 0;
+  const attendancePendingCount: number = 0;
 
   return (
     <div className="mx-auto max-w-6xl p-4 sm:p-6">

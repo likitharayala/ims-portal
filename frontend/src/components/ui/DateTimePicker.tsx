@@ -159,9 +159,9 @@ export function DateTimePicker({ value, onChange, placeholder = 'Select date & t
       if (!triggerRef.current) return;
 
       const rect = triggerRef.current.getBoundingClientRect();
+      const gutter = 16;
       const popupWidth = Math.min(320, window.innerWidth - gutter * 2);
       const popupHeight = 540;
-      const gutter = 16;
 
       let left = rect.left;
       if (left + popupWidth > window.innerWidth - gutter) {
