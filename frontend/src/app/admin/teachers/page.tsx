@@ -19,9 +19,11 @@ import { toIST, getApiError } from '@/lib/utils';
 function CreateTeacherModal({
   onClose,
   onCreated,
+  onError,
 }: {
   onClose: () => void;
   onCreated: (name: string, email: string, tempPassword: string) => void;
+  onError: (message: string) => void;
 }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -45,8 +47,7 @@ function CreateTeacherModal({
       onCreated(result.teacher.user.name, result.teacher.user.email, result.tempPassword);
       onClose();
     } catch (err) {
-      // error shown via parent toast
-      throw err;
+      onError(getApiError(err));
     }
   };
 
@@ -117,9 +118,13 @@ function CreateTeacherModal({
 function EditTeacherModal({
   teacher,
   onClose,
+  onError,
+  onUpdated,
 }: {
   teacher: Teacher;
   onClose: () => void;
+  onError: (message: string) => void;
+  onUpdated: () => void;
 }) {
   const [name, setName] = useState(teacher.user.name);
   const [phone, setPhone] = useState(teacher.user.phone ?? '');
@@ -132,11 +137,16 @@ function EditTeacherModal({
       .split(',')
       .map((c) => c.trim())
       .filter(Boolean);
-    await updateMutation.mutateAsync({
-      id: teacher.id,
-      data: { name, phone: phone || undefined, assignedClasses },
-    });
-    onClose();
+    try {
+      await updateMutation.mutateAsync({
+        id: teacher.id,
+        data: { name, phone: phone || undefined, assignedClasses },
+      });
+      onUpdated();
+      onClose();
+    } catch (err) {
+      onError(getApiError(err));
+    }
   };
 
   return (
@@ -448,15 +458,17 @@ export default function TeachersPage() {
             setCredential({ name, email, tempPassword });
             showToast('Teacher added successfully');
           }}
+          onError={(message) => showToast(message, 'error')}
         />
       )}
 
       {editingTeacher && (
         <EditTeacherModal
           teacher={editingTeacher}
+          onError={(message) => showToast(message, 'error')}
+          onUpdated={() => showToast('Teacher updated')}
           onClose={() => {
             setEditingTeacher(null);
-            showToast('Teacher updated');
           }}
         />
       )}

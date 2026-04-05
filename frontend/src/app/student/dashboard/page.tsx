@@ -32,10 +32,37 @@ interface StudentDashboardData {
   recentMaterials: Material[];
 }
 
-const STATUS_BADGE: Record<string, string> = {
-  published: 'bg-blue-100 text-blue-700',
-  active: 'bg-green-100 text-green-700',
-};
+function SummaryCard({
+  href,
+  value,
+  label,
+  accentClass,
+  loading,
+}: {
+  href: string;
+  value: number;
+  label: string;
+  accentClass: string;
+  loading: boolean;
+}) {
+  return (
+    <Link href={href} className="block">
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-colors hover:bg-slate-50">
+        {loading ? (
+          <div className="animate-pulse space-y-2">
+            <div className="mx-auto h-8 w-10 rounded bg-slate-200" />
+            <div className="mx-auto h-3 w-24 rounded bg-slate-100" />
+          </div>
+        ) : (
+          <div className="text-center">
+            <p className={`text-3xl font-bold ${accentClass}`}>{value}</p>
+            <p className="mt-1 text-xs font-medium text-slate-500">{label}</p>
+          </div>
+        )}
+      </div>
+    </Link>
+  );
+}
 
 export default function StudentDashboardPage() {
   const { user } = useAuthStore();
@@ -48,275 +75,292 @@ export default function StudentDashboardPage() {
     },
   });
 
-  const nextAssessment = data?.upcomingAssessments[0];
+  const nextAssessment = data?.upcomingAssessments[0] ?? null;
   const nextAssessmentLocked = nextAssessment?.status === 'published';
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
-      {/* Welcome */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-semibold text-slate-800">
-          Hi, {user?.name?.split(' ')[0]} 👋
-        </h1>
-        <p className="text-sm text-slate-500 mt-1">Here's your overview for today.</p>
-      </div>
+    <div className="mx-auto max-w-5xl p-6">
+      <div className="space-y-8">
+        {/* Greeting Section */}
+        <section>
+          <h1 className="text-2xl font-semibold text-slate-800">
+            Hi {user?.name?.split(' ')[0]} 👋
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">
+            Ready to continue your learning today?
+          </p>
+        </section>
 
-      {/* Next assessment */}
-      <div className="mb-8">
-        <div className="bg-white rounded-xl border border-slate-200 p-6">
-          {isLoading ? (
-            <div className="animate-pulse space-y-3">
-              <div className="h-4 w-32 bg-slate-200 rounded" />
-              <div className="h-7 w-56 bg-slate-100 rounded" />
-              <div className="h-4 w-40 bg-slate-100 rounded" />
-              <div className="h-10 w-36 bg-slate-200 rounded-lg" />
-            </div>
-          ) : nextAssessment ? (
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div>
-                <p className="text-sm font-medium text-slate-500 mb-2">Next Assessment</p>
-                <h2 className="text-xl font-semibold text-slate-800">{nextAssessment.title}</h2>
-                <p className="text-sm text-slate-500 mt-1">
-                  {nextAssessment.startAt
-                    ? toIST(nextAssessment.startAt, 'dd MMMM — hh:mm a')
-                    : 'Schedule to be announced'}
-                </p>
+        {/* Next Assessment Card */}
+        <section>
+          <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-blue-50 via-white to-slate-50 p-6 shadow-sm">
+            {isLoading ? (
+              <div className="animate-pulse space-y-3">
+                <div className="h-4 w-32 rounded bg-slate-200" />
+                <div className="h-7 w-56 rounded bg-slate-100" />
+                <div className="h-4 w-28 rounded bg-slate-100" />
+                <div className="h-4 w-44 rounded bg-slate-100" />
+                <div className="h-10 w-40 rounded-lg bg-slate-200" />
               </div>
+            ) : nextAssessment ? (
+              <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <p className="text-sm font-medium text-slate-500">Next Assessment</p>
+                  <h2 className="mt-2 text-2xl font-semibold text-slate-800">
+                    {nextAssessment.title}
+                  </h2>
+                  <p className="mt-2 text-sm text-blue-700">
+                    {nextAssessment.subject ?? 'General'}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {nextAssessment.startAt
+                      ? toIST(nextAssessment.startAt, 'dd MMMM, hh:mm a')
+                      : 'Schedule to be announced'}
+                  </p>
+                </div>
 
-              {nextAssessmentLocked ? (
-                <button
-                  type="button"
-                  disabled
-                  className="inline-flex items-center justify-center rounded-lg bg-slate-100 px-4 py-2.5 text-sm font-medium text-slate-400 cursor-not-allowed"
-                >
-                  Starts Soon
-                </button>
-              ) : (
+                {nextAssessmentLocked ? (
+                  <button
+                    type="button"
+                    disabled
+                    className="inline-flex items-center justify-center rounded-lg bg-slate-100 px-4 py-2.5 text-sm font-medium text-slate-400 cursor-not-allowed"
+                  >
+                    Starts Soon
+                  </button>
+                ) : (
+                  <Link
+                    href={`/student/assessments/${nextAssessment.id}`}
+                    className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700"
+                  >
+                    Start Assessment
+                  </Link>
+                )}
+              </div>
+            ) : (
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <p className="text-sm font-medium text-slate-500">Next Assessment</p>
+                  <h2 className="mt-2 text-2xl font-semibold text-slate-800">
+                    No upcoming assessments
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Check your assessments page for newly published exams.
+                  </p>
+                </div>
+
                 <Link
-                  href={`/student/assessments/${nextAssessment.id}`}
+                  href="/student/assessments"
                   className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700"
                 >
-                  Start Assessment
+                  View Assessments
                 </Link>
-              )}
-            </div>
-          ) : (
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div>
-                <p className="text-sm font-medium text-slate-500 mb-2">Next Assessment</p>
-                <h2 className="text-xl font-semibold text-slate-800">No upcoming assessments</h2>
-                <p className="text-sm text-slate-500 mt-1">
-                  New assessments will appear here when your institute publishes them.
-                </p>
               </div>
-              <Link
-                href="/student/assessments"
-                className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700"
-              >
-                View Assessments
-              </Link>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Summary cards */}
-      <div className="grid grid-cols-3 gap-4 mb-8">
-        <Link href="/student/assessments" className="block">
-          <div className="bg-white rounded-xl border border-slate-200 p-5 text-center">
-            {isLoading ? (
-              <div className="animate-pulse space-y-2">
-                <div className="h-8 w-10 bg-slate-200 rounded mx-auto" />
-                <div className="h-3 w-24 bg-slate-100 rounded mx-auto" />
-              </div>
-            ) : (
-              <>
-                <p className="text-3xl font-bold text-blue-700">
-                  {data?.upcomingAssessments.length ?? 0}
-                </p>
-                <p className="text-xs text-slate-500 mt-1">Upcoming Assessments</p>
-              </>
             )}
           </div>
-        </Link>
+        </section>
 
-        <Link href="/student/notifications" className="block">
-          <div className="bg-white rounded-xl border border-slate-200 p-5 text-center">
+        {/* Summary Cards */}
+        <section>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <SummaryCard
+              href="/student/assessments"
+              value={data?.upcomingAssessments.length ?? 0}
+              label="Upcoming Assessments"
+              accentClass="text-blue-700"
+              loading={isLoading}
+            />
+            <SummaryCard
+              href="/student/notifications"
+              value={data?.unreadNotifications ?? 0}
+              label="Unread Notifications"
+              accentClass="text-amber-600"
+              loading={isLoading}
+            />
+            <SummaryCard
+              href="/student/materials"
+              value={data?.recentMaterials.length ?? 0}
+              label="Recent Materials"
+              accentClass="text-purple-700"
+              loading={isLoading}
+            />
+          </div>
+        </section>
+
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          {/* Upcoming Assessments Section */}
+          <section>
+            <div className="mb-3">
+              <h2 className="text-base font-semibold text-slate-800">Upcoming Assessments</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Keep track of what is scheduled next.
+              </p>
+            </div>
+
             {isLoading ? (
-              <div className="animate-pulse space-y-2">
-                <div className="h-8 w-10 bg-slate-200 rounded mx-auto" />
-                <div className="h-3 w-24 bg-slate-100 rounded mx-auto" />
+              <div className="space-y-3">
+                {[1, 2].map((i) => (
+                  <div
+                    key={i}
+                    className="animate-pulse rounded-2xl border border-slate-200 bg-white p-5"
+                  >
+                    <div className="mb-3 h-4 w-40 rounded bg-slate-200" />
+                    <div className="mb-2 h-3 w-24 rounded bg-slate-100" />
+                    <div className="h-3 w-36 rounded bg-slate-100" />
+                  </div>
+                ))}
+              </div>
+            ) : data?.upcomingAssessments.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center">
+                <p className="text-sm text-slate-400">No upcoming assessments</p>
+                <Link
+                  href="/student/assessments"
+                  className="mt-4 inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                >
+                  View Assessments
+                </Link>
               </div>
             ) : (
-              <>
-                <p className="text-3xl font-bold text-amber-600">
-                  {data?.unreadNotifications ?? 0}
-                </p>
-                <p className="text-xs text-slate-500 mt-1">Unread Notifications</p>
-              </>
-            )}
-          </div>
-        </Link>
+              <div className="space-y-3">
+                {data?.upcomingAssessments.map((assessment) => {
+                  const isLocked = assessment.status === 'published';
 
-        <Link href="/student/materials" className="block">
-          <div className="bg-white rounded-xl border border-slate-200 p-5 text-center">
-            {isLoading ? (
-              <div className="animate-pulse space-y-2">
-                <div className="h-8 w-10 bg-slate-200 rounded mx-auto" />
-                <div className="h-3 w-24 bg-slate-100 rounded mx-auto" />
-              </div>
-            ) : (
-              <>
-                <p className="text-3xl font-bold text-purple-700">
-                  {data?.recentMaterials.length ?? 0}
-                </p>
-                <p className="text-xs text-slate-500 mt-1">Recent Materials</p>
-              </>
-            )}
-          </div>
-        </Link>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Upcoming Assessments */}
-        <div>
-          <h2 className="text-base font-semibold text-slate-800 mb-3">Upcoming Assessments</h2>
-          {isLoading ? (
-            <div className="space-y-3">
-              {[1, 2].map((i) => (
-                <div key={i} className="bg-white rounded-xl border border-slate-200 p-4 animate-pulse">
-                  <div className="h-4 w-48 bg-slate-200 rounded mb-2" />
-                  <div className="h-3 w-32 bg-slate-100 rounded" />
-                </div>
-              ))}
-            </div>
-          ) : data?.upcomingAssessments.length === 0 ? (
-            <div className="bg-white rounded-xl border border-slate-200 border-dashed p-8 text-center">
-              <p className="text-slate-400 text-sm">No upcoming assessments</p>
-              <Link
-                href="/student/assessments"
-                className="inline-flex items-center justify-center mt-4 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-              >
-                View Assessments
-              </Link>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {data?.upcomingAssessments.map((a) => {
-                const isLocked = a.status === 'published';
-                const cardContent = (
-                  <>
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        {isLocked && (
-                          <span
-                            aria-label="Locked assessment"
-                            className="text-sm text-slate-400"
-                          >
-                            🔒
-                          </span>
-                        )}
-                        <h3 className="font-medium text-slate-800 text-sm truncate">
-                          {a.title}
-                        </h3>
-                      </div>
-                      <span
-                        className={`flex-shrink-0 text-xs px-2 py-0.5 rounded-full font-medium ${
-                          STATUS_BADGE[a.status] ?? 'bg-slate-100 text-slate-600'
-                        }`}
-                      >
-                        {a.status}
-                      </span>
-                    </div>
-                    {a.subject && (
-                      <p className="text-xs text-slate-500 mb-2">{a.subject}</p>
-                    )}
-                    <div className="flex gap-4 text-xs text-slate-400">
-                      {a.startAt && (
-                        <span>Start: {toIST(a.startAt, 'dd MMM, hh:mm a')}</span>
-                      )}
-                      {a.endAt && (
-                        <span>End: {toIST(a.endAt, 'dd MMM, hh:mm a')}</span>
-                      )}
-                    </div>
-                    <p className="text-xs text-slate-400 mt-1">
-                      Total marks: {a.totalMarks}
-                    </p>
-                  </>
-                );
-
-                if (isLocked) {
                   return (
                     <div
-                      key={a.id}
-                      className="bg-white rounded-xl border border-slate-200 p-4 cursor-not-allowed opacity-75 pointer-events-none"
+                      key={assessment.id}
+                      className={`rounded-2xl border border-slate-200 bg-white p-5 shadow-sm ${
+                        isLocked ? 'cursor-not-allowed opacity-70' : ''
+                      }`}
                     >
-                      {cardContent}
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <h3 className="truncate text-base font-semibold text-slate-800">
+                            {assessment.title}
+                          </h3>
+                          <p className="mt-1 text-sm text-slate-500">
+                            {assessment.subject ?? 'General'}
+                          </p>
+                        </div>
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-xs font-medium capitalize ${
+                            isLocked
+                              ? 'bg-blue-100 text-blue-700'
+                              : 'bg-green-100 text-green-700'
+                          }`}
+                        >
+                          {assessment.status}
+                        </span>
+                      </div>
+
+                      <div className="mt-4 space-y-1 text-sm text-slate-500">
+                        <p>
+                          Start:{' '}
+                          <span className="text-slate-700">
+                            {assessment.startAt
+                              ? toIST(assessment.startAt, 'dd MMM, hh:mm a')
+                              : 'TBA'}
+                          </span>
+                        </p>
+                        <p>
+                          End:{' '}
+                          <span className="text-slate-700">
+                            {assessment.endAt
+                              ? toIST(assessment.endAt, 'dd MMM, hh:mm a')
+                              : 'TBA'}
+                          </span>
+                        </p>
+                        <p>
+                          Total Marks:{' '}
+                          <span className="text-slate-700">{assessment.totalMarks}</span>
+                        </p>
+                      </div>
+
+                      <div className="mt-4">
+                        {isLocked ? (
+                          <button
+                            type="button"
+                            disabled
+                            className="inline-flex items-center justify-center rounded-lg bg-slate-100 px-4 py-2 text-sm font-medium text-slate-400 cursor-not-allowed"
+                          >
+                            Starts Soon
+                          </button>
+                        ) : (
+                          <Link
+                            href={`/student/assessments/${assessment.id}`}
+                            className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                          >
+                            Start Exam
+                          </Link>
+                        )}
+                      </div>
                     </div>
                   );
-                }
+                })}
+              </div>
+            )}
+          </section>
 
-                return (
-                  <Link
-                    key={a.id}
-                    href={`/student/assessments/${a.id}`}
-                    className="block bg-white rounded-xl border border-slate-200 p-4"
+          {/* Recent Materials Section */}
+          <section>
+            <div className="mb-3">
+              <h2 className="text-base font-semibold text-slate-800">Recent Materials</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Revisit the latest uploads from your institute.
+              </p>
+            </div>
+
+            {isLoading ? (
+              <div className="space-y-3">
+                {[1, 2].map((i) => (
+                  <div
+                    key={i}
+                    className="animate-pulse rounded-2xl border border-slate-200 bg-white p-5"
                   >
-                    {cardContent}
-                  </Link>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Recent Materials */}
-        <div>
-          <h2 className="text-base font-semibold text-slate-800 mb-3">Recent Materials</h2>
-          {isLoading ? (
-            <div className="space-y-3">
-              {[1, 2].map((i) => (
-                <div key={i} className="bg-white rounded-xl border border-slate-200 p-4 animate-pulse">
-                  <div className="h-4 w-48 bg-slate-200 rounded mb-2" />
-                  <div className="h-3 w-32 bg-slate-100 rounded" />
-                </div>
-              ))}
-            </div>
-          ) : data?.recentMaterials.length === 0 ? (
-            <div className="bg-white rounded-xl border border-slate-200 border-dashed p-8 text-center">
-              <p className="text-slate-400 text-sm">No materials uploaded yet</p>
-              <Link
-                href="/student/materials"
-                className="inline-flex items-center justify-center mt-4 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-              >
-                Browse Materials
-              </Link>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {data?.recentMaterials.map((m) => (
-                <div
-                  key={m.id}
-                  className="bg-white rounded-xl border border-slate-200 p-4"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-medium text-slate-800 text-sm truncate">
-                        {m.title}
-                      </h3>
-                      <p className="text-xs text-slate-500 mt-0.5">{m.subject}</p>
-                      {m.author && (
-                        <p className="text-xs text-slate-400 mt-0.5">by {m.author}</p>
-                      )}
-                    </div>
-                    <span className="flex-shrink-0 text-xs text-slate-400">
-                      {toIST(m.createdAt, 'dd MMM')}
-                    </span>
+                    <div className="mb-3 h-4 w-40 rounded bg-slate-200" />
+                    <div className="mb-2 h-3 w-24 rounded bg-slate-100" />
+                    <div className="h-9 w-28 rounded-lg bg-slate-100" />
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            ) : data?.recentMaterials.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center">
+                <p className="text-sm text-slate-400">No materials uploaded yet</p>
+                <Link
+                  href="/student/materials"
+                  className="mt-4 inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                >
+                  Browse Materials
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {data?.recentMaterials.slice(0, 5).map((material) => (
+                  <div
+                    key={material.id}
+                    className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <h3 className="truncate text-base font-semibold text-slate-800">
+                          {material.title}
+                        </h3>
+                        <p className="mt-1 text-sm text-slate-500">{material.subject}</p>
+                        <p className="mt-2 text-xs text-slate-400">
+                          Uploaded {toIST(material.createdAt, 'dd MMM yyyy')}
+                        </p>
+                      </div>
+
+                      <Link
+                        href={`/student/materials/${material.id}`}
+                        className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                      >
+                        Open Material
+                      </Link>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
         </div>
       </div>
     </div>
