@@ -435,9 +435,11 @@ There is no payment gateway or online collection.
 Admin manually records and updates payment status.
 
 Fee amount:
-Fee amount is set per student per month by admin.
+Each student has a default fee amount set by the admin at the time of student creation.
+The fee amount remains the same every month until the admin explicitly changes it.
+When admin changes the fee amount for a student, the new amount applies from the next month onwards.
+Previous months retain their original amount and are not affected.
 Different students can have different fee amounts.
-Admin creates monthly payment records for each student.
 
 Grid with filters (filter by: month, status, batch)
 Status indicator: green = paid, red = pending/overdue
@@ -446,7 +448,14 @@ Modal shows last 10 months of payment history for a student
 Payment statuses:
 pending – created but not yet paid
 paid – admin marked as paid
-overdue – admin manually marks as overdue (no automatic calculation)
+overdue – automatically set by the system; admin can also manually mark as overdue
+
+Auto-overdue rule:
+A daily scheduled job (NestJS @Cron) runs once per day.
+Any payment with status pending where the payment month has passed by more than 5 days is automatically transitioned to overdue.
+Example: January payment → overdue on February 6th if still pending.
+The transition is written to audit_logs.
+Admin can still manually change overdue → paid or overdue → pending at any time.
 
 Edit payment status:
 Admin can change status between pending, paid, overdue.
