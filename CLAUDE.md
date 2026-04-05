@@ -67,9 +67,11 @@ All timestamps stored UTC. All UI displays in **IST (UTC+5:30)**. Assessment tim
 | Assessment auto-submit | Yes — auto-submits at `end_at` if student hasn't submitted |
 | Assessment auto-save | Yes — every 60 seconds during active exam |
 | MCQ auto-evaluation | Auto-evaluated when assessment closes. Admin triggers final total calculation |
-| Negative marking | Admin decides per assessment. If enabled, admin sets deduction value per wrong MCQ. Unattempted always = 0 |
+| Negative marking | Admin decides per assessment. If enabled, admin sets deduction value per wrong MCQ. Unattempted always = 0. Total capped at 0 — never goes negative |
 | Unattempted questions | Shows "Not attempted" in evaluation view. Marks field empty — admin enters 0 manually if needed |
-| Results visibility | Students see per-question marks breakdown + admin feedback per answer, after `results_released = true` |
+| Absent students | Never submitted = Absent badge in evaluation list. Marks auto-set to 0. No evaluation action needed |
+| Results release | Admin can release per individual student OR release all at once. Marks always editable after release — no lock. Students see updated marks immediately |
+| Results visibility | Students see per-question marks breakdown + admin feedback per answer, after results released |
 | Admin evaluation UI | Student-by-student navigation. Typed answers + uploaded files inline side by side. Mixed submissions: both visible, admin enters one set of marks. Upload-only: admin chooses per-question marks or single total. Progress bar + per-student badge. Marks auto-save as typed + Finalise button at end |
 | Can admin mix AI + manual questions? | Yes |
 | AI generation failure fallback | Show error, allow manual entry |
