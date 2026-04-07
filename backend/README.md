@@ -35,14 +35,14 @@ $ npm install
 
 Required environment variables:
 
-- `EMAIL_PROVIDER`
-- `RESEND_API_KEY`
+- `EMAIL_PROVIDER=smtp`
+- `SMTP_HOST`
+- `SMTP_PORT`
+- `SMTP_USER`
+- `SMTP_PASS`
+- `SMTP_FROM`
 
-Current supported provider:
-
-- `EMAIL_PROVIDER=resend`
-
-When `EMAIL_PROVIDER=resend`, the backend uses Resend as the email transport and requires a valid `RESEND_API_KEY`.
+Email is sent via SMTP (Nodemailer). Configure with a Gmail App Password or any SMTP-compatible relay.
 
 The `EMAIL_PROVIDER` value controls which email transport `EmailService` uses. This keeps provider selection in configuration so future providers can be added without changing signup or provisioning business logic.
 

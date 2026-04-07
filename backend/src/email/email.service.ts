@@ -1,16 +1,46 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Resend } from 'resend';
+import { createTransport, type Transporter } from 'nodemailer';
 
 @Injectable()
-export class EmailService {
+export class EmailService implements OnModuleInit {
   private readonly logger = new Logger(EmailService.name);
-  private readonly resend: Resend;
+  private readonly transporter: Transporter;
+  private readonly fromAddress: string;
   private readonly provider: string;
+  private readonly smtpHost: string;
+  private readonly smtpPort: number;
 
   constructor(private readonly config: ConfigService) {
-    this.provider = this.config.get<string>('EMAIL_PROVIDER') ?? 'resend';
-    this.resend = new Resend(this.config.get<string>('RESEND_API_KEY'));
+    this.provider = (this.config.get<string>('EMAIL_PROVIDER') ?? 'smtp').toLowerCase();
+    this.fromAddress = this.config.get<string>('SMTP_FROM') ?? 'Teachly <no-reply@localhost>';
+    this.smtpHost = this.config.get<string>('SMTP_HOST') ?? '';
+    this.smtpPort = Number(this.config.get<string>('SMTP_PORT') ?? 587);
+
+    this.transporter = createTransport({
+      host: this.smtpHost,
+      port: this.smtpPort,
+      secure: this.smtpPort === 465,
+      auth: {
+        user: this.config.get<string>('SMTP_USER'),
+        pass: this.config.get<string>('SMTP_PASS'),
+      },
+    });
+  }
+
+  async onModuleInit(): Promise<void> {
+    this.logger.log(
+      `SMTP transport configured: provider=${this.provider} host=${this.smtpHost} port=${this.smtpPort}`,
+    );
+
+    try {
+      await this.transporter.verify();
+      this.logger.log('SMTP connection verified');
+    } catch (error) {
+      this.logger.error(
+        `SMTP connection failed: ${(error as Error).message}`,
+      );
+    }
   }
 
   async sendVerificationEmail(email: string, name: string, token: string): Promise<void> {
@@ -76,20 +106,16 @@ export class EmailService {
 
   private async send(options: { to: string; subject: string; html: string }): Promise<void> {
     try {
-      if (this.provider !== 'resend') {
+      if (this.provider !== 'smtp') {
         throw new Error(`Unsupported email provider: ${this.provider}`);
       }
 
-      const { error } = await this.resend.emails.send({
-        from: 'Teachly <onboarding@resend.dev>',
+      await this.transporter.sendMail({
+        from: this.fromAddress,
         to: options.to,
         subject: options.subject,
         html: options.html,
       });
-
-      if (error) {
-        throw new Error(error.message);
-      }
     } catch (error) {
       this.logger.error(`Failed to send email to ${options.to}: ${(error as Error).message}`);
       throw error;

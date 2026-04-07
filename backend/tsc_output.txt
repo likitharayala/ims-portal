@@ -1,0 +1,7 @@
+﻿src/auth/auth.service.spec.ts(506,20): error TS2322: Type '"students"' is not assignable to type 'Feature'.
+src/auth/auth.service.spec.ts(544,20): error TS2322: Type '"students"' is not assignable to type 'Feature'.
+src/auth/auth.service.spec.ts(602,20): error TS2322: Type '"students"' is not assignable to type 'Feature'.
+src/auth/auth.service.spec.ts(643,20): error TS2322: Type '"students"' is not assignable to type 'Feature'.
+src/auth/auth.service.spec.ts(687,20): error TS2322: Type '"students"' is not assignable to type 'Feature'.
+src/auth/services/supabase-token-verifier.service.spec.ts(131,15): error TS2339: Property 'kid' does not exist on type 'JsonWebKey'.
+src/common/guards/jwt-auth.guard.spec.ts(89,7): error TS2353: Object literal may only specify known properties, and 'response' does not exist in type 'Partial<ForbiddenException>'.

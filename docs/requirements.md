@@ -1,50 +1,36 @@
 # Requirements
 
-## Email Delivery Provider Configuration
+## Email Provider Strategy
 
-### Previous
+### Application Emails
 
-Email delivery used SMTP via Nodemailer.
+Application emails are sent via SMTP transport from backend `EmailService`.
 
-### Current
+This includes:
 
-Email delivery now uses the Resend API provider.
+- signup verification emails (custom flow)
+- password reset emails
+- student onboarding credential emails (including background job delivery)
 
-### Configuration
+### Supabase Auth Emails
 
-Email transport is now selected through configuration:
+Supabase handles auth-provider-owned flows only:
 
-- `EMAIL_PROVIDER`
-- `RESEND_API_KEY`
+- verification/invite emails when Supabase provisioning paths are active
+- auth callback completion remains in Supabase-auth flow
 
-Current production value:
+### Runtime Configuration
 
-- `EMAIL_PROVIDER=resend`
+Backend email transport configuration:
 
-When `EMAIL_PROVIDER=resend`, the backend uses:
+- `EMAIL_PROVIDER=smtp`
+- `SMTP_HOST`
+- `SMTP_PORT`
+- `SMTP_USER`
+- `SMTP_PASS`
+- `SMTP_FROM`
 
-- package: `resend`
-- auth: `RESEND_API_KEY`
-- sender: `Teachly <onboarding@resend.dev>`
-
-### Why
-
-This keeps email provider selection config-driven instead of hardcoding business flow changes into signup or provisioning logic.
-
-### Design Decision
-
-Email provider selection now belongs to the transport layer inside `EmailService`.
-
-This does **not** change:
-- signup flow
-- background job behavior
-- retry behavior
-- auth flow
-- JWT behavior
-
-### Future Extension
-
-SMTP or SendGrid support can be added later behind `EMAIL_PROVIDER` without changing signup flow, provisioning flow, or background retry logic.
+Resend has been removed from runtime email transport.
 
 ## Supabase Email Verification Flow
 
