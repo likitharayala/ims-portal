@@ -11,7 +11,7 @@ async function bootstrap() {
         : ['error', 'warn', 'log', 'debug', 'verbose'],
   });
   const frontendUrl = process.env.FRONTEND_URL?.replace(/\/$/, '');
-  const port = Number(process.env.PORT) || 3000;
+  const port = process.env.PORT || 8080;
 
   // Global validation pipe
   app.useGlobalPipes(
