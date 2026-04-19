@@ -1,9 +1,9 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createTransport, type Transporter } from 'nodemailer';
 
 @Injectable()
-export class EmailService implements OnModuleInit {
+export class EmailService {
   private readonly logger = new Logger(EmailService.name);
   private readonly transporter: Transporter;
   private readonly fromAddress: string;
@@ -26,21 +26,10 @@ export class EmailService implements OnModuleInit {
         pass: this.config.get<string>('SMTP_PASS'),
       },
     });
-  }
 
-  async onModuleInit(): Promise<void> {
     this.logger.log(
-      `SMTP transport configured: provider=${this.provider} host=${this.smtpHost} port=${this.smtpPort}`,
+      `SMTP transport configured without startup verification: provider=${this.provider} host=${this.smtpHost} port=${this.smtpPort}`,
     );
-
-    try {
-      await this.transporter.verify();
-      this.logger.log('SMTP connection verified');
-    } catch (error) {
-      this.logger.error(
-        `SMTP connection failed: ${(error as Error).message}`,
-      );
-    }
   }
 
   async sendVerificationEmail(email: string, name: string, token: string): Promise<void> {

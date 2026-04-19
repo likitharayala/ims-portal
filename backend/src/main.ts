@@ -1,5 +1,5 @@
 import { NestFactory } from '@nestjs/core';
-import { Logger, ValidationPipe } from '@nestjs/common';
+import { Logger, RequestMethod, ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -11,7 +11,7 @@ async function bootstrap() {
         : ['error', 'warn', 'log', 'debug', 'verbose'],
   });
   const frontendUrl = process.env.FRONTEND_URL?.replace(/\/$/, '');
-  const port = process.env.PORT || 8080;
+  const port = process.env.PORT || 10000;
 
   // Global validation pipe
   app.useGlobalPipes(
@@ -55,8 +55,10 @@ async function bootstrap() {
     allowedHeaders: ['Content-Type', 'Authorization'],
   });
 
-  // Global prefix
-  app.setGlobalPrefix('api/v1');
+  // Keep Render's health check available at GET /health while the rest of the API stays under /api/v1.
+  app.setGlobalPrefix('api/v1', {
+    exclude: [{ path: 'health', method: RequestMethod.GET }],
+  });
   app.enableShutdownHooks();
 
   await app.listen(port, '0.0.0.0');

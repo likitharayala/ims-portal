@@ -20,6 +20,7 @@ import { PaymentsModule } from './payments/payments.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { AttendanceModule } from './attendance/attendance.module';
 import { TeachersModule } from './teachers/teachers.module';
+import { HealthModule } from './health/health.module';
 
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { ResponseEnvelopeInterceptor } from './common/interceptors/response.interceptor';
@@ -74,6 +75,7 @@ import { ThrottlerGuard } from '@nestjs/throttler';
     NotificationsModule,
     AttendanceModule,
     TeachersModule,
+    HealthModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: GlobalExceptionFilter },
