@@ -3,7 +3,8 @@ import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
 
-const API_BASE = 'http://localhost:3001/api/v1';
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api/v1';
 
 async function loginWithRetry(credentials: { emailOrPhone: string; password: string }) {
   for (let attempt = 1; attempt <= 5; attempt++) {

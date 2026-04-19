@@ -1,7 +1,8 @@
 import type { Page } from '@playwright/test';
 import axios from 'axios';
 
-const API_BASE = 'http://localhost:3001/api/v1';
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api/v1';
 
 const ADMIN_EMAIL = 'lillyjoj1729@gmail.com';
 const ADMIN_PASSWORD = 'Test@123';
